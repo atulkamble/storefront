@@ -51,12 +51,22 @@ textarea:focus-visible {
   min-height: 34px;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   background: var(--green);
   color: white;
   font-size: 10px;
   letter-spacing: .12em;
   text-align: center;
   text-transform: uppercase;
+}
+
+.announcement a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lime);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .site-header {
@@ -712,6 +722,25 @@ textarea:focus-visible {
   margin-top: 2px;
 }
 
+.auth-success {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 26px 28px 4px;
+  text-align: center;
+}
+
+.auth-success p {
+  margin: 0;
+  color: var(--green);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-success .button-primary {
+  width: 100%;
+}
+
 .drawer-header {
   display: flex;
   min-height: 78px;
@@ -1071,6 +1100,249 @@ textarea:focus-visible {
   margin-top: 22px;
 }
 
+.offers-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 78px 8.3% 96px;
+}
+
+.offers-heading {
+  max-width: 620px;
+  margin-bottom: 42px;
+}
+
+.offers-heading h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(48px, 6vw, 76px);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.offers-heading>p:last-child {
+  max-width: 450px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.offers-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.offer-card {
+  display: flex;
+  min-height: 390px;
+  flex-direction: column;
+  padding: 25px;
+  border-top: 3px solid var(--green);
+  background: #ebe9df;
+}
+
+.offer-card-2 {
+  border-color: #87952e;
+  background: #e6ecc2;
+}
+
+.offer-card-3 {
+  border-color: #bd7655;
+  background: #eee1d6;
+}
+
+.offer-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.offer-card-head .eyebrow {
+  margin: 0;
+}
+
+.offer-spark {
+  color: var(--green);
+  font-size: 20px;
+}
+
+.offer-amount {
+  margin: 28px 0 10px;
+  color: var(--green);
+  font-family: var(--serif);
+  font-size: 44px;
+  line-height: 1;
+}
+
+.offer-card h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.offer-description {
+  min-height: 42px;
+  margin: 10px 0 15px;
+  color: #5c5c54;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.offer-minimum {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.offer-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: 11px 0;
+  border-top: 1px solid rgb(32 32 29 / 15%);
+  color: #53534d;
+  font-size: 10px;
+}
+
+.offer-code-row code {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.offer-apply {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.offers-footnote {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.offers-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.coupon-form {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.coupon-form label {
+  color: #53534d;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.coupon-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+
+.coupon-input-row input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: 0;
+  background: #fffefa;
+  color: var(--ink);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.coupon-input-row button {
+  min-width: 62px;
+  padding: 0 12px;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.coupon-applied {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+  padding: 10px;
+  background: #e5ebd9;
+}
+
+.coupon-applied>div {
+  display: grid;
+  gap: 3px;
+}
+
+.coupon-applied strong {
+  color: var(--green);
+  font-size: 10px;
+}
+
+.coupon-applied span {
+  color: #5c5c54;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.coupon-applied .coupon-savings {
+  white-space: nowrap;
+}
+
+.coupon-applied button {
+  padding: 4px 0 4px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  font-size: 9px;
+  text-decoration: underline;
+}
+
+.coupon-pending {
+  background: #f0e9dc;
+}
+
+.discount-row,
+.total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+  font-size: 11px;
+}
+
+.discount-row {
+  color: var(--green);
+}
+
+.total-row {
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.total-row strong {
+  font-size: 14px;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -1153,11 +1425,20 @@ textarea:focus-visible {
   .product-detail-grid {
     gap: 6%;
   }
+
+  .offers-page {
+    padding: 64px 6% 72px;
+  }
+
+  .offers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media(max-width:600px) {
   .announcement {
     min-height: 31px;
+    gap: 8px;
     padding: 0 10px;
     font-size: 8px
   }
@@ -1198,6 +1479,37 @@ textarea:focus-visible {
 
   .detail-content h1 {
     font-size: 44px;
+  }
+
+  .offers-page {
+    padding: 52px 20px 60px;
+  }
+
+  .offers-heading {
+    margin-bottom: 28px;
+  }
+
+  .offers-heading h1 {
+    font-size: 48px;
+  }
+
+  .offers-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .offer-card {
+    min-height: 360px;
+    padding: 22px;
+  }
+
+  .coupon-applied {
+    grid-template-columns: 1fr auto;
+  }
+
+  .coupon-applied button {
+    grid-column: 2;
+    justify-self: end;
   }
 
   .detail-actions .button-primary {

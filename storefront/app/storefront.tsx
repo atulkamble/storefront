@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowRight, Check, Heart, Minus, Plus, Search, ShoppingBag, Truck, X } from "lucide-react";
+import { ArrowRight, Check, Heart, KeyRound, Minus, Plus, Search, ShoppingBag, Truck, X } from "lucide-react";
 import Link from "next/link";
-import { readStoredCart, useStoredCart, writeStoredCart } from "@/lib/cart-storage";
+import { readStoredCart, useStoredCart, useStoredCoupon, writeStoredCart, writeStoredCoupon } from "@/lib/cart-storage";
+import { calculateOfferDiscount, findOffer } from "@/lib/offers";
 import type { Product } from "@/lib/types";
 
 type Props = { products: Product[] };
 type Customer = { name: string; email: string; address: string };
 type SortOption = "popular" | "price-low-high" | "price-high-low";
-type AuthMode = "signin" | "signup";
+type AuthMode = "signin" | "signup" | "reset";
 type AccountUser = { id: string; name: string; email: string };
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
 export default function Storefront({ products }: Props) {
     const cart = useStoredCart();
+    const couponCode = useStoredCoupon();
     const [favorites, setFavorites] = useState<Record<string, boolean>>({});
     const [category, setCategory] = useState("All pieces");
     const [sortOption, setSortOption] = useState<SortOption>("popular");
@@ -27,13 +29,18 @@ export default function Storefront({ products }: Props) {
     const [orderError, setOrderError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [bagNotice, setBagNotice] = useState<{ name: string; added: boolean } | null>(null);
+    const [dismissedCoupon, setDismissedCoupon] = useState("");
+    const [couponInput, setCouponInput] = useState("");
+    const [couponError, setCouponError] = useState("");
     const [account, setAccount] = useState<AccountUser | null>(null);
     const [authOpen, setAuthOpen] = useState(false);
     const [authMode, setAuthMode] = useState<AuthMode>("signin");
     const [authName, setAuthName] = useState("");
     const [authEmail, setAuthEmail] = useState("");
     const [authPassword, setAuthPassword] = useState("");
+    const [authNewPassword, setAuthNewPassword] = useState("");
     const [authError, setAuthError] = useState("");
+    const [authSuccess, setAuthSuccess] = useState("");
     const [authSubmitting, setAuthSubmitting] = useState(false);
     const categories = ["All pieces", ...new Set(products.map((product) => product.category))];
     const shownProducts = useMemo(() => products.filter((product) => {
@@ -48,6 +55,11 @@ export default function Storefront({ products }: Props) {
     const cartItems = products.filter((product) => cart[product.id]).map((product) => ({ ...product, quantity: cart[product.id] }));
     const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0);
     const subtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    const activeOffer = couponCode ? findOffer(couponCode) : undefined;
+    const couponEligible = !couponCode || Boolean(activeOffer && subtotal >= activeOffer.minimumSubtotal);
+    const discount = activeOffer ? calculateOfferDiscount(activeOffer, subtotal) : 0;
+    const estimatedTotal = subtotal - discount;
+    const couponNotice = couponCode !== dismissedCoupon ? couponCode : "";
 
     useEffect(() => {
         let active = true;
@@ -70,6 +82,9 @@ export default function Storefront({ products }: Props) {
     function openAuth(mode: AuthMode) {
         setAuthMode(mode);
         setAuthError("");
+        setAuthSuccess("");
+        setAuthPassword("");
+        setAuthNewPassword("");
         setAuthOpen(true);
     }
 
@@ -78,13 +93,23 @@ export default function Storefront({ products }: Props) {
         setAuthSubmitting(true);
         setAuthError("");
         try {
-            const response = await fetch(`/api/auth/${authMode}`, {
+            const isReset = authMode === "reset";
+            const response = await fetch(isReset ? "/api/auth/reset-password" : `/api/auth/${authMode}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: authName, email: authEmail, password: authPassword }),
+                body: JSON.stringify(isReset
+                    ? { currentPassword: authPassword, newPassword: authNewPassword }
+                    : { name: authName, email: authEmail, password: authPassword }),
             });
-            const result = await response.json() as { user?: AccountUser; error?: string };
-            if (!response.ok || !result.user) throw new Error(result.error ?? "Authentication failed.");
+            const result = await response.json() as { user?: AccountUser; error?: string; message?: string };
+            if (!response.ok) throw new Error(result.error ?? "Authentication failed.");
+            if (isReset) {
+                setAuthSuccess(result.message ?? "Your password was reset.");
+                setAuthPassword("");
+                setAuthNewPassword("");
+                return;
+            }
+            if (!result.user) throw new Error(result.error ?? "Authentication failed.");
             setAccount(result.user);
             setCustomer((current) => ({ ...current, name: result.user!.name, email: result.user!.email }));
             setAuthPassword("");
@@ -123,6 +148,26 @@ export default function Storefront({ products }: Props) {
         setBagNotice({ name: product.name, added: true });
     }
 
+    function applyCoupon(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const offer = findOffer(couponInput);
+        if (!offer) {
+            setCouponError("That offer code is not valid.");
+            return;
+        }
+        writeStoredCoupon(offer.code);
+        setCouponInput(offer.code);
+        setCouponError("");
+        setDismissedCoupon("");
+    }
+
+    function removeCoupon() {
+        writeStoredCoupon("");
+        setCouponInput("");
+        setCouponError("");
+        setDismissedCoupon("");
+    }
+
     async function placeOrder(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setSubmitting(true);
@@ -131,12 +176,13 @@ export default function Storefront({ products }: Props) {
             const response = await fetch("/api/orders", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ customer, items: cartItems.map(({ id, quantity }) => ({ productId: id, quantity })) }),
+                body: JSON.stringify({ customer, couponCode: couponCode || undefined, items: cartItems.map(({ id, quantity }) => ({ productId: id, quantity })) }),
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error ?? "We could not place your order.");
             setOrderId(result.orderId);
             writeStoredCart({});
+            writeStoredCoupon("");
             setCheckout(false);
         } catch (error) {
             setOrderError(error instanceof Error ? error.message : "We could not place your order.");
@@ -146,22 +192,23 @@ export default function Storefront({ products }: Props) {
     }
 
     return <>
-        <div className="announcement">A little more considered, a little less ordinary</div>
+        <div className="announcement"><span>A little more considered, a little less ordinary</span><Link href="/offers">Current offers <ArrowRight size={12} /></Link></div>
         <header className="site-header">
             <a className="wordmark" href="#top" aria-label="Commonplace home">common<span>place</span></a>
             <nav className="main-nav" aria-label="Main navigation">
-                <a href="#shop">Shop all</a><a href="#shop" onClick={() => setCategory("Tableware")}>Table & kitchen</a><a href="#story">Our point of view</a>
+                <a href="#shop">Shop all</a><a href="#shop" onClick={() => setCategory("Tableware")}>Table & kitchen</a><Link href="/offers">Offers</Link><a href="#story">Our point of view</a>
             </nav>
             <div className="header-actions">
                 {account ? <>
                     <span className="account-greeting">Hi, {account.name.split(" ")[0]}</span>
+                    <button className="icon-button auth-reset-trigger" type="button" aria-label="Reset password" title="Reset password" onClick={() => openAuth("reset")}><KeyRound size={17} /></button>
                     <button className="auth-button" type="button" onClick={signOut}>Sign out</button>
                 </> : <>
                     <button className="auth-button" type="button" onClick={() => openAuth("signin")}>Sign in</button>
                     <button className="auth-button auth-signup" type="button" onClick={() => openAuth("signup")}>Sign up</button>
                 </>}
                 <button className="icon-button" type="button" aria-label="Search products" onClick={() => setSearchOpen(!searchOpen)}>{searchOpen ? <X size={18} /> : <Search size={18} />}</button>
-                <button className="icon-button cart-trigger" type="button" aria-label={`Open bag, ${cartCount} items`} onClick={() => { setCartOpen(true); setOrderError(""); setBagNotice(null); }}><ShoppingBag size={19} />{cartCount > 0 && <span className="cart-count">{cartCount}</span>}</button>
+                <button className="icon-button cart-trigger" type="button" aria-label={`Open bag, ${cartCount} items`} onClick={() => { setCartOpen(true); setOrderError(""); setBagNotice(null); setDismissedCoupon(couponCode); }}><ShoppingBag size={19} />{cartCount > 0 && <span className="cart-count">{cartCount}</span>}</button>
             </div>
             {searchOpen && <div className="search-wrap"><input autoFocus className="search-input" aria-label="Search the collection" placeholder="Search the collection" value={search} onChange={(event) => setSearch(event.target.value)} /></div>}
         </header>
@@ -201,26 +248,29 @@ export default function Storefront({ products }: Props) {
         {authOpen && <>
             <button className="drawer-scrim auth-scrim" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)} />
             <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-                <div className="drawer-header"><h2 id="auth-title">{authMode === "signup" ? "Create your account" : "Welcome back"}</h2><button className="icon-button" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)}><X size={19} /></button></div>
-                <div className="auth-tabs" role="tablist" aria-label="Account access">
-                    <button className={authMode === "signin" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signin"} onClick={() => { setAuthMode("signin"); setAuthError(""); }}>Sign in</button>
-                    <button className={authMode === "signup" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signup"} onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Sign up</button>
-                </div>
-                <form className="auth-form" onSubmit={submitAuth}>
-                    {authMode === "signup" && <label>Full name<input required minLength={2} maxLength={80} autoComplete="name" value={authName} onChange={(event) => setAuthName(event.target.value)} /></label>}
-                    <label>Email<input required type="email" maxLength={254} autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>
-                    <label>Password<input required type="password" minLength={authMode === "signup" ? 8 : 1} maxLength={128} autoComplete={authMode === "signup" ? "new-password" : "current-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>
-                    {authError && <p className="checkout-error" role="alert">{authError}</p>}
-                    <button className="button-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "Please wait…" : authMode === "signup" ? "Create account" : "Sign in"}<ArrowRight size={15} /></button>
-                </form>
+                <div className="drawer-header"><h2 id="auth-title">{authMode === "signup" ? "Create your account" : authMode === "reset" ? "Reset your password" : "Welcome back"}</h2><button className="icon-button" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)}><X size={19} /></button></div>
+                {authSuccess ? <div className="auth-success" role="status"><span className="order-success-icon"><Check size={22} /></span><p>{authSuccess}</p><button className="button-primary" type="button" onClick={() => setAuthOpen(false)}>Done</button></div> : <>
+                    {authMode !== "reset" && <div className="auth-tabs" role="tablist" aria-label="Account access">
+                        <button className={authMode === "signin" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signin"} onClick={() => { setAuthMode("signin"); setAuthError(""); }}>Sign in</button>
+                        <button className={authMode === "signup" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signup"} onClick={() => { setAuthMode("signup"); setAuthError(""); }}>Sign up</button>
+                    </div>}
+                    <form className="auth-form" onSubmit={submitAuth}>
+                        {authMode === "signup" && <label>Full name<input required minLength={2} maxLength={80} autoComplete="name" value={authName} onChange={(event) => setAuthName(event.target.value)} /></label>}
+                        {authMode !== "reset" && <label>Email<input required type="email" maxLength={254} autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>}
+                        <label>{authMode === "reset" ? "Current password" : "Password"}<input required type="password" minLength={authMode === "signup" ? 8 : 1} maxLength={128} autoComplete={authMode === "signup" ? "new-password" : "current-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>
+                        {authMode === "reset" && <label>New password<input required type="password" minLength={8} maxLength={128} autoComplete="new-password" value={authNewPassword} onChange={(event) => setAuthNewPassword(event.target.value)} /></label>}
+                        {authError && <p className="checkout-error" role="alert">{authError}</p>}
+                        <button className="button-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "Please wait…" : authMode === "signup" ? "Create account" : authMode === "reset" ? "Reset password" : "Sign in"}<ArrowRight size={15} /></button>
+                    </form>
+                </>}
             </section>
         </>}
 
-        {bagNotice && !cartOpen && <div className="add-toast" role="status" aria-live="polite">
+        {(bagNotice || couponNotice) && !cartOpen && <div className="add-toast" role="status" aria-live="polite">
             <span className="toast-check"><Check size={17} /></span>
-            <span className="toast-copy"><strong>{bagNotice.added ? "Added to your bag" : "Quantity limit reached"}</strong><span>{bagNotice.name}</span></span>
-            <button className="toast-view" type="button" onClick={() => { setCartOpen(true); setBagNotice(null); }}>View bag <ArrowRight size={14} /></button>
-            <button className="toast-dismiss" type="button" aria-label="Dismiss notification" onClick={() => setBagNotice(null)}><X size={16} /></button>
+            <span className="toast-copy"><strong>{bagNotice ? bagNotice.added ? "Added to your bag" : "Quantity limit reached" : "Offer added to your bag"}</strong><span>{bagNotice ? bagNotice.name : `${couponNotice} is ready. Open your bag to see your savings.`}</span></span>
+            <button className="toast-view" type="button" onClick={() => { setCartOpen(true); setBagNotice(null); setDismissedCoupon(couponCode); }}>View bag <ArrowRight size={14} /></button>
+            <button className="toast-dismiss" type="button" aria-label="Dismiss notification" onClick={() => { setBagNotice(null); setDismissedCoupon(couponCode); }}><X size={16} /></button>
         </div>}
 
         {cartOpen && <>
@@ -231,13 +281,27 @@ export default function Storefront({ products }: Props) {
                     <div className="drawer-items">{cartItems.length === 0 ? <div className="drawer-empty"><ShoppingBag size={26} /><p>Your bag is taking a little breather.</p><button className="add-button" type="button" onClick={() => setCartOpen(false)}>Find something good <ArrowRight size={14} /></button></div> : cartItems.map((item) => <div className="cart-line" key={item.id}>
                         <div className="cart-line-image" role="img" aria-label={item.name} style={{ backgroundImage: `url("${item.imageUrl}")` }} /><div className="cart-line-details"><h3>{item.name}</h3><p>{money(item.price)}</p><div className="quantity-control" aria-label={`Quantity for ${item.name}`}><button type="button" aria-label={`Remove one ${item.name}`} onClick={() => changeQuantity(item.id, -1)}><Minus size={12} /></button><span>{item.quantity}</span><button type="button" aria-label={`Add one ${item.name}`} disabled={item.quantity >= 10} onClick={() => changeQuantity(item.id, 1)}><Plus size={12} /></button></div></div><span className="cart-line-total">{money(item.price * item.quantity)}</span>
                     </div>)}</div>
-                    {cartItems.length > 0 && <div className="drawer-footer"><div className="subtotal-row"><span>Subtotal</span><span>{money(subtotal)}</span></div><p className="shipping-note">Shipping and any applicable taxes are calculated separately.</p>
+                    {cartItems.length > 0 && <div className="drawer-footer">
+                        <form className="coupon-form" onSubmit={applyCoupon}>
+                            <label htmlFor="coupon-code">Offer code</label>
+                            <div className="coupon-input-row"><input id="coupon-code" maxLength={32} placeholder="Enter code" value={couponInput} onChange={(event) => setCouponInput(event.target.value)} /><button type="submit">Apply</button></div>
+                            {couponError && <p className="checkout-error" role="alert">{couponError}</p>}
+                        </form>
+                        {couponCode && <div className={`coupon-applied${couponEligible ? "" : " coupon-pending"}`}>
+                            <div><strong>{activeOffer?.code ?? couponCode}</strong><span>{activeOffer ? couponEligible ? activeOffer.title : `Add ${money(activeOffer.minimumSubtotal - subtotal)} to unlock` : "This offer is no longer available"}</span></div>
+                            {discount > 0 && <strong className="coupon-savings">-{money(discount)}</strong>}
+                            <button type="button" onClick={removeCoupon}>Remove</button>
+                        </div>}
+                        <div className="subtotal-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+                        {discount > 0 && <div className="discount-row"><span>Offer discount</span><span>-{money(discount)}</span></div>}
+                        <div className="total-row"><span>Estimated total</span><strong>{money(estimatedTotal)}</strong></div>
+                        <p className="shipping-note">Shipping and any applicable taxes are calculated separately.</p>
                         {checkout ? <form className="checkout-form" onSubmit={placeOrder}>
                             <label>Name<input required minLength={2} maxLength={80} autoComplete="name" value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} /></label>
                             <label>Email<input required type="email" maxLength={254} autoComplete="email" value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} /></label>
                             <label>Shipping address<textarea required minLength={8} maxLength={300} autoComplete="street-address" value={customer.address} onChange={(event) => setCustomer({ ...customer, address: event.target.value })} /></label>
-                            {orderError && <p className="checkout-error" role="alert">{orderError}</p>}<p className="payment-note">Demo checkout only. No payment will be collected.</p><button className="button-primary" type="submit" disabled={submitting}>{submitting ? "Placing order…" : "Place order"}<ArrowRight size={15} /></button>
-                        </form> : <button className="button-primary" type="button" onClick={() => setCheckout(true)}>Continue to checkout <ArrowRight size={15} /></button>}
+                            {orderError && <p className="checkout-error" role="alert">{orderError}</p>}<p className="payment-note">Demo checkout only. No payment will be collected.</p><button className="button-primary" type="submit" disabled={submitting || !couponEligible}>{submitting ? "Placing order…" : "Place order"}<ArrowRight size={15} /></button>
+                        </form> : <button className="button-primary" type="button" disabled={!couponEligible} onClick={() => setCheckout(true)}>Continue to checkout <ArrowRight size={15} /></button>}
                     </div>}
                 </>}
             </aside>

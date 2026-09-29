@@ -27,6 +27,8 @@ storeDatabase.exec(`
   CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL,
     shipping_address TEXT NOT NULL, total INTEGER NOT NULL CHECK (total >= 0),
+    subtotal INTEGER NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
+    discount INTEGER NOT NULL DEFAULT 0 CHECK (discount >= 0), coupon_code TEXT,
     status TEXT NOT NULL DEFAULT 'placed', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE TABLE IF NOT EXISTS order_items (
@@ -45,6 +47,18 @@ storeDatabase.exec(`
   CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
 `);
 
+const orderColumns = storeDatabase.pragma("table_info(orders)") as { name: string }[];
+if (!orderColumns.some((column) => column.name === "subtotal")) {
+    storeDatabase.exec("ALTER TABLE orders ADD COLUMN subtotal INTEGER NOT NULL DEFAULT 0 CHECK (subtotal >= 0)");
+}
+if (!orderColumns.some((column) => column.name === "discount")) {
+    storeDatabase.exec("ALTER TABLE orders ADD COLUMN discount INTEGER NOT NULL DEFAULT 0 CHECK (discount >= 0)");
+}
+if (!orderColumns.some((column) => column.name === "coupon_code")) {
+    storeDatabase.exec("ALTER TABLE orders ADD COLUMN coupon_code TEXT");
+}
+storeDatabase.exec("UPDATE orders SET subtotal = total WHERE subtotal = 0 AND total > 0");
+
 const insertProduct = storeDatabase.prepare(`
   INSERT OR IGNORE INTO products (id, name, category, description, price, imageUrl, badge, stock)
   VALUES (@id, @name, @category, @description, @price, @imageUrl, @badge, @stock)
@@ -58,18 +72,18 @@ export function getProducts(): Product[] {
 }
 
 export function getProductById(id: string): Product | null {
-  const product = storeDatabase.prepare("SELECT * FROM products WHERE id = ?").get(id) as Product | undefined;
-  return product ?? null;
+    const product = storeDatabase.prepare("SELECT * FROM products WHERE id = ?").get(id) as Product | undefined;
+    return product ?? null;
 }
 
 export const getCachedProducts = unstable_cache(
-  async () => getProducts(),
-  ["commonplace-products"],
-  { revalidate: 300, tags: ["products"] },
+    async () => getProducts(),
+    ["commonplace-products"],
+    { revalidate: 300, tags: ["products"] },
 );
 
 export const getCachedProductById = unstable_cache(
-  async (id: string) => getProductById(id),
-  ["commonplace-product-by-id"],
-  { revalidate: 60, tags: ["products"] },
+    async (id: string) => getProductById(id),
+    ["commonplace-product-by-id"],
+    { revalidate: 60, tags: ["products"] },
 );

@@ -3,6 +3,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 
 export const CART_STORAGE_KEY = "commonplace-cart";
+export const COUPON_STORAGE_KEY = "commonplace-coupon";
 const CART_CHANGE_EVENT = "commonplace-cart-change";
 
 function subscribe(listener: () => void) {
@@ -37,6 +38,14 @@ export function useStoredCart(): Record<string, number> {
     return useMemo(() => parseCart(serialized), [serialized]);
 }
 
+function getCouponSnapshot(): string {
+    return window.localStorage.getItem(COUPON_STORAGE_KEY) ?? "";
+}
+
+export function useStoredCoupon(): string {
+    return useSyncExternalStore(subscribe, getCouponSnapshot, () => "");
+}
+
 export function readStoredCart(): Record<string, number> {
     try {
         return parseCart(getSnapshot());
@@ -48,6 +57,16 @@ export function readStoredCart(): Record<string, number> {
 export function writeStoredCart(cart: Record<string, number>): void {
     try {
         window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+        window.dispatchEvent(new Event(CART_CHANGE_EVENT));
+    } catch {
+        // Keep shopping usable when browser storage is unavailable.
+    }
+}
+
+export function writeStoredCoupon(code: string): void {
+    try {
+        if (code) window.localStorage.setItem(COUPON_STORAGE_KEY, code.trim().toUpperCase());
+        else window.localStorage.removeItem(COUPON_STORAGE_KEY);
         window.dispatchEvent(new Event(CART_CHANGE_EVENT));
     } catch {
         // Keep shopping usable when browser storage is unavailable.

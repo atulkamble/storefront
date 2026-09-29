@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidateTag } from "next/cache";
 import { storeDatabase } from "@/lib/store";
+import { calculateOfferDiscount, findOffer } from "@/lib/offers";
 import type { CartItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -8,6 +9,7 @@ export const runtime = "nodejs";
 type OrderRequest = {
     customer?: { name?: unknown; email?: unknown; address?: unknown };
     items?: unknown;
+    couponCode?: unknown;
 };
 
 class OrderError extends Error {
@@ -45,6 +47,10 @@ export async function POST(request: Request) {
     if ([...quantities.values()].some((quantity) => quantity > 10)) {
         return Response.json({ error: "The limit is 10 of each item per order." }, { status: 400 });
     }
+    if (body.couponCode !== undefined && body.couponCode !== null && typeof body.couponCode !== "string") {
+        return Response.json({ error: "The offer code is invalid." }, { status: 400 });
+    }
+    const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim().toUpperCase() : "";
 
     const orderId = `CP-${randomUUID().slice(0, 8).toUpperCase()}`;
     try {
@@ -57,9 +63,19 @@ export async function POST(request: Request) {
                 if (product.stock < quantity) throw new OrderError(`${product.name} does not have enough stock for this quantity.`, 409);
                 return { ...product, quantity };
             });
-            const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
-            storeDatabase.prepare(`INSERT INTO orders (id, customer_name, customer_email, shipping_address, total) VALUES (?, ?, ?, ?, ?)`)
-                .run(orderId, name, email, address, total);
+            const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+            const offer = couponCode ? findOffer(couponCode) : undefined;
+            if (couponCode && !offer) throw new OrderError("That offer code is not valid.", 400);
+            if (offer && subtotal < offer.minimumSubtotal) {
+                const amountRemaining = offer.minimumSubtotal - subtotal;
+                throw new OrderError(`Add ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amountRemaining / 100)} more to use ${offer.code}.`, 400);
+            }
+            const discount = offer ? calculateOfferDiscount(offer, subtotal) : 0;
+            const total = subtotal - discount;
+            storeDatabase.prepare(`
+                            INSERT INTO orders (id, customer_name, customer_email, shipping_address, subtotal, discount, coupon_code, total)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        `).run(orderId, name, email, address, subtotal, discount, offer?.code ?? null, total);
             const insertItem = storeDatabase.prepare(`INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity) VALUES (?, ?, ?, ?, ?)`);
             const reduceStock = storeDatabase.prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
             for (const line of lines) {
@@ -68,7 +84,7 @@ export async function POST(request: Request) {
                     throw new OrderError(`${line.name} just sold out. Please refresh your cart.`, 409);
                 }
             }
-            return { total, itemCount: lines.reduce((sum, line) => sum + line.quantity, 0) };
+            return { subtotal, discount, couponCode: offer?.code ?? null, total, itemCount: lines.reduce((sum, line) => sum + line.quantity, 0) };
         });
         const order = createOrder();
         revalidateTag("products", "max");
