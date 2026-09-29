@@ -1,0 +1,12 @@
+import type { Product } from "./types";
+
+export const seedProducts: Product[] = [
+    { id: "rill-stoneware-cup", name: "Rill Stoneware Cup", category: "Tableware", description: "A softly sculpted cup, glazed by hand in small batches.", price: 2800, imageUrl: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&w=900&q=85", badge: "Bestseller", stock: 18 },
+    { id: "arc-table-lamp", name: "Arc Table Lamp", category: "Lighting", description: "Warm, quiet light for the end of a long day.", price: 12800, imageUrl: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=85", badge: "New", stock: 9 },
+    { id: "field-linen-throw", name: "Field Linen Throw", category: "Textiles", description: "Washed European linen with a little texture and a lot of ease.", price: 9600, imageUrl: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85", badge: null, stock: 12 },
+    { id: "morrow-vase", name: "Morrow Bud Vase", category: "Objects", description: "A little bit of shape for a single stem or the kitchen shelf.", price: 4200, imageUrl: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?auto=format&fit=crop&w=900&q=85", badge: null, stock: 16 },
+    { id: "weekday-serving-board", name: "Weekday Serving Board", category: "Tableware", description: "Solid oak, shaped for the snack that turns into supper.", price: 5400, imageUrl: "https://images.unsplash.com/photo-1603199506016-b9a594b593c0?auto=format&fit=crop&w=900&q=85", badge: "Small batch", stock: 7 },
+    { id: "dawn-glass-vessel", name: "Dawn Glass Vessel", category: "Objects", description: "Recycled glass with a hand-finished, softly rounded rim.", price: 3600, imageUrl: "https://images.unsplash.com/photo-1612196808214-b7e1d6145a8c?auto=format&fit=crop&w=900&q=85", badge: null, stock: 14 },
+    { id: "still-cushion-cover", name: "Still Cushion Cover", category: "Textiles", description: "Textural cotton in a grounded, easy-to-live-with palette.", price: 4800, imageUrl: "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?auto=format&fit=crop&w=900&q=85", badge: null, stock: 11 },
+    { id: "low-tide-candle", name: "Low Tide Candle", category: "Objects", description: "A clean-burning candle with notes of cedar and green fig.", price: 3200, imageUrl: "https://images.unsplash.com/photo-1602874801007-bd458bb1b8b6?auto=format&fit=crop&w=900&q=85", badge: "Made nearby", stock: 22 },
+];
