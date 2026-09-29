@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { getApplicationSecret } from "./app-secrets";
 import { storeDatabase } from "./store";
 
 export const SESSION_COOKIE_NAME = "commonplace_session";
@@ -38,10 +39,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
 }
 
 export function hashSignupOtp(email: string, code: string): string {
-    const secret = process.env.AUTH_OTP_SECRET ?? (process.env.NODE_ENV === "development"
-        ? "commonplace-development-only-otp-secret"
-        : undefined);
-    if (!secret) throw new Error("AUTH_OTP_SECRET is not configured");
+    const secret = process.env.AUTH_OTP_SECRET || getApplicationSecret("signup-otp");
     return createHmac("sha256", secret).update(`${email}:${code}`).digest("hex");
 }
 

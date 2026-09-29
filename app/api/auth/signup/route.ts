@@ -32,8 +32,7 @@ function hasResendConfiguration(): boolean {
 }
 
 function canDeliverSignupCode(): boolean {
-    return Boolean(process.env.AUTH_OTP_SECRET && (hasAwsSesConfiguration() || hasResendConfiguration()))
-        || process.env.NODE_ENV === "development";
+    return hasAwsSesConfiguration() || hasResendConfiguration() || process.env.NODE_ENV === "development";
 }
 
 async function deliverSignupCode(email: string, code: string): Promise<void> {

@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { GetEmailIdentityCommand, SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { CreateEmailIdentityCommand, GetEmailIdentityCommand, SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { getApplicationKey } from "./app-secrets";
 import { storeDatabase } from "./store";
 
 export type AwsOutputFormat = "json" | "yaml" | "yaml-stream" | "text" | "table";
@@ -31,10 +32,8 @@ export type AwsSettingsSummary = {
 
 function encryptionKey(): Buffer {
     const value = process.env.AWS_CONFIG_ENCRYPTION_KEY ?? "";
-    if (!/^[a-f0-9]{64}$/i.test(value)) {
-        throw new Error("Set AWS_CONFIG_ENCRYPTION_KEY to a 32-byte hex key before saving AWS credentials.");
-    }
-    return Buffer.from(value, "hex");
+    if (value && !/^[a-f0-9]{64}$/i.test(value)) throw new Error("AWS_CONFIG_ENCRYPTION_KEY must be a 32-byte hex key.");
+    return getApplicationKey();
 }
 
 function encryptCredentials(credentials: AwsCredentials) {
@@ -150,6 +149,31 @@ export async function testAwsSesConfiguration(): Promise<{ senderEmail: string; 
     const client = createSesClient(settings);
     const identity = await client.send(new GetEmailIdentityCommand({ EmailIdentity: settings.sender_email }));
     return { senderEmail: settings.sender_email, verified: identity.VerifiedForSendingStatus === true };
+}
+
+export async function requestAwsSesIdentityVerification(): Promise<{ senderEmail: string; verified: boolean; emailSent: boolean }> {
+    const settings = readStoredSettings();
+    if (!settings) throw new Error("Save AWS settings before verifying the sender.");
+    const client = createSesClient(settings);
+    try {
+        const identity = await client.send(new GetEmailIdentityCommand({ EmailIdentity: settings.sender_email }));
+        return {
+            senderEmail: settings.sender_email,
+            verified: identity.VerifiedForSendingStatus === true,
+            emailSent: false,
+        };
+    } catch (error) {
+        const notFound = error instanceof Error && (
+            error.name === "NotFoundException"
+            || error.name === "ResourceNotFoundException"
+            || ("$metadata" in error && typeof error.$metadata === "object" && error.$metadata !== null
+                && "httpStatusCode" in error.$metadata && error.$metadata.httpStatusCode === 404)
+        );
+        if (!notFound) throw error;
+    }
+
+    await client.send(new CreateEmailIdentityCommand({ EmailIdentity: settings.sender_email }));
+    return { senderEmail: settings.sender_email, verified: false, emailSent: true };
 }
 
 export async function sendAwsSignupCode(email: string, code: string): Promise<void> {

@@ -14,6 +14,9 @@ export async function POST() {
         recordActivity("admin.aws.tested", "admin", `AWS SES connection verified for ${result.senderEmail}`);
         return NextResponse.json({ ok: true, message: `SES is connected and ${result.senderEmail} is verified for sending.` });
     } catch (error) {
+        if (error instanceof Error && (error.name === "NotFoundException" || error.name === "ResourceNotFoundException")) {
+            return NextResponse.json({ error: "The sender identity is not registered in this SES region. Use Send verification email to register it." }, { status: 404 });
+        }
         const reason = error instanceof Error ? error.message : "AWS SES connection failed.";
         recordActivity("admin.aws.test_failed", "admin", "AWS SES connection test failed");
         return NextResponse.json({ error: reason }, { status: 502 });
