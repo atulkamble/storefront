@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { removeCurrentSession, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { recordActivity } from "@/lib/admin";
+import { getCurrentUser, removeCurrentSession, SESSION_COOKIE_NAME } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST() {
+    const user = await getCurrentUser();
     await removeCurrentSession();
+    if (user) recordActivity("account.signout", user.email, "Customer signed out");
     const response = NextResponse.json({ ok: true });
     response.cookies.set(SESSION_COOKIE_NAME, "", {
         httpOnly: true,

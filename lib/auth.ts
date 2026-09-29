@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { storeDatabase } from "./store";
 
@@ -11,6 +11,7 @@ export type AccountUser = {
     id: string;
     name: string;
     email: string;
+    mobileNumber: string;
 };
 
 function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
@@ -36,6 +37,21 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     return timingSafeEqual(expected, actual);
 }
 
+export function hashSignupOtp(email: string, code: string): string {
+    const secret = process.env.AUTH_OTP_SECRET ?? (process.env.NODE_ENV === "development"
+        ? "commonplace-development-only-otp-secret"
+        : undefined);
+    if (!secret) throw new Error("AUTH_OTP_SECRET is not configured");
+    return createHmac("sha256", secret).update(`${email}:${code}`).digest("hex");
+}
+
+export function verifySignupOtp(email: string, code: string, storedHash: string): boolean {
+    if (!/^[a-f0-9]{64}$/i.test(storedHash)) return false;
+    const actual = Buffer.from(hashSignupOtp(email, code), "hex");
+    const expected = Buffer.from(storedHash, "hex");
+    return timingSafeEqual(expected, actual);
+}
+
 function hashSessionToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
 }
@@ -55,7 +71,7 @@ export async function getCurrentUser(): Promise<AccountUser | null> {
     const now = new Date().toISOString();
     storeDatabase.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now);
     const user = storeDatabase.prepare(`
-      SELECT users.id, users.name, users.email
+    SELECT users.id, users.name, users.email, users.mobile_number AS mobileNumber
       FROM sessions JOIN users ON users.id = sessions.user_id
       WHERE sessions.token_hash = ? AND sessions.expires_at > ?
     `).get(hashSessionToken(token), now) as AccountUser | undefined;

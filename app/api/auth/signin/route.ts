@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordActivity } from "@/lib/admin";
 import { createSession, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, verifyPassword, type AccountUser } from "@/lib/auth";
 import { storeDatabase } from "@/lib/store";
 
@@ -17,15 +18,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
     }
 
-    const userRecord = storeDatabase.prepare("SELECT id, name, email, password_hash FROM users WHERE email = ?")
+    const userRecord = storeDatabase.prepare("SELECT id, name, email, mobile_number AS mobileNumber, password_hash FROM users WHERE email = ?")
         .get(email) as (AccountUser & { password_hash: string }) | undefined;
     if (!userRecord || !(await verifyPassword(password, userRecord.password_hash))) {
         return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
     }
 
     try {
-        const user: AccountUser = { id: userRecord.id, name: userRecord.name, email: userRecord.email };
+        const user: AccountUser = { id: userRecord.id, name: userRecord.name, email: userRecord.email, mobileNumber: userRecord.mobileNumber };
         const token = createSession(user.id);
+        recordActivity("account.signin", user.email, "Customer signed in");
         const response = NextResponse.json({ user });
         response.cookies.set(SESSION_COOKIE_NAME, token, {
             httpOnly: true,

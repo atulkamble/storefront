@@ -1,4 +1,4 @@
-# Commonplace Storefront
+# Storefront
 
 A full-stack homewares shop built with Next.js App Router, React, TypeScript, and SQLite.
 
@@ -23,13 +23,21 @@ The Offers page is available at `/offers`. Current codes are `WELCOME10` (10% of
 
 - `GET /api/products` returns the current catalog and stock.
 - `POST /api/orders` validates customer details, stock, and coupon eligibility, then records the order and decrements inventory in one transaction.
-- `POST /api/auth/signup` creates an account and starts a session.
+- `POST /api/auth/signup` emails a signup verification code; pass `{ "resend": true, "email": "..." }` to resend after the cooldown.
+- `POST /api/auth/verify-signup` verifies the emailed code, creates the account, and starts a session.
 - `POST /api/auth/signin` verifies credentials and starts a session.
 - `POST /api/auth/reset-password` verifies the signed-in user's current password, updates its hash, and revokes old sessions.
 - `POST /api/auth/signout` ends the current session.
 - `GET /api/auth/me` returns the current account, if signed in.
 
 Accounts store a salted scrypt password hash, never the plaintext password. Session tokens are stored as hashes in SQLite and sent to the browser in an HttpOnly cookie.
+Signup collects and stores a mobile number with the account; only the email address is verified by the signup code.
+Signup codes expire after 10 minutes and are limited to five attempts. Configure `AUTH_OTP_SECRET` for code hashing. Email can be delivered by Amazon SES from Admin > AWS setup, or by Resend using `RESEND_API_KEY` and `AUTH_EMAIL_FROM`.
 Password reset requires an active session and current password. Email-based account recovery is not configured.
 
 Checkout is a demo flow and does not collect or process payment details. Production deployments need a persistent database and a configured payment provider.
+
+## Admin dashboard
+
+Open `/admin` to view customer accounts, orders, inventory alerts, and the activity audit trail. Local development defaults to username `admin` and password `admin`. Production requires `ADMIN_USERNAME` and a unique, strong `ADMIN_PASSWORD`; the development defaults are disabled in production. The audit trail records signup, sign-in/out, password reset, order placement, and admin login events. It does not record product browsing or cart changes, which remain browser-local.
+AWS SES settings are available inside the admin dashboard. Before saving AWS access keys, set `AWS_CONFIG_ENCRYPTION_KEY` to a private 32-byte hex key (`openssl rand -hex 32`) and restart the server. Credentials are encrypted in SQLite and never returned to the UI. Verify the SES sender identity and grant the credentials permission to read that identity and send email. The stored CLI output preference does not modify the host's AWS CLI files; the app uses the AWS SDK.

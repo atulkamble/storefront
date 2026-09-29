@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { revalidateTag } from "next/cache";
+import { recordActivity } from "@/lib/admin";
 import { storeDatabase } from "@/lib/store";
 import { calculateOfferDiscount, findOffer } from "@/lib/offers";
 import type { CartItem } from "@/lib/types";
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
             return { subtotal, discount, couponCode: offer?.code ?? null, total, itemCount: lines.reduce((sum, line) => sum + line.quantity, 0) };
         });
         const order = createOrder();
+        recordActivity("order.placed", email, `Order ${orderId} placed for ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(order.total / 100)}`);
         revalidateTag("products", "max");
         return Response.json({ orderId, ...order }, { status: 201 });
     } catch (error) {

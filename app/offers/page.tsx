@@ -5,7 +5,7 @@ import ApplyOfferButton from "./apply-offer-button";
 import { offers } from "@/lib/offers";
 
 export const metadata: Metadata = {
-    title: "Offers | Commonplace",
+    title: "Offers | Storefront",
     description: "A few thoughtful offers for your next favorite thing.",
 };
 
@@ -15,7 +15,7 @@ export default function OffersPage() {
     return <>
         <div className="announcement"><span>A little more considered, a little less ordinary</span><Link href="/offers">Current offers <ArrowRight size={12} /></Link></div>
         <header className="detail-header">
-            <Link className="wordmark" href="/" aria-label="Commonplace home">common<span>place</span></Link>
+            <Link className="wordmark" href="/" aria-label="Storefront home">store<span>front</span></Link>
             <Link className="detail-header-link" href="/#shop"><ArrowLeft size={15} />Shop all</Link>
         </header>
         <main className="offers-page">
@@ -38,6 +38,6 @@ export default function OffersPage() {
             <p className="offers-footnote">One offer per order. Offers apply to merchandise subtotal before shipping and taxes.</p>
             <Link className="offers-back-link" href="/#shop">Back to the collection <ArrowRight size={15} /></Link>
         </main>
-        <footer className="site-footer"><Link className="wordmark" href="/">common<span>place</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
+        <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
     </>;
 }

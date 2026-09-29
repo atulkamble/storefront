@@ -18,9 +18,9 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
     const { id } = await params;
     const product = await getCachedProductById(id);
-    if (!product) return { title: "Product not found | Commonplace" };
+    if (!product) return { title: "Product not found | Storefront" };
     return {
-        title: `${product.name} | Commonplace`,
+        title: `${product.name} | Storefront`,
         description: product.description,
     };
 }
@@ -34,7 +34,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <>
             <div className="announcement">A little more considered, a little less ordinary</div>
             <header className="detail-header">
-                <Link className="wordmark" href="/" aria-label="Commonplace home">common<span>place</span></Link>
+                <Link className="wordmark" href="/" aria-label="Storefront home">store<span>front</span></Link>
                 <Link className="detail-header-link" href="/#shop"><ArrowLeft size={15} />All pieces</Link>
             </header>
             <main className="product-detail-page">
@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     </section>
                 </div>
             </main>
-            <footer className="site-footer"><Link className="wordmark" href="/">common<span>place</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
+            <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
         </>
     );
 }

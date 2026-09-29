@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordActivity } from "@/lib/admin";
 import { createSession, getCurrentUser, hashPassword, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, verifyPassword } from "@/lib/auth";
 import { storeDatabase } from "@/lib/store";
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
             return createSession(user.id);
         });
         const token = resetPassword();
+        recordActivity("account.password.reset", user.email, "Customer password reset");
         const response = NextResponse.json({ user, message: "Your password was reset." });
         response.cookies.set(SESSION_COOKIE_NAME, token, {
             httpOnly: true,
