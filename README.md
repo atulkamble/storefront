@@ -14,6 +14,132 @@ Checkout is a demo flow: orders update inventory, but no payment details are col
 - `lib/offers.ts` defines coupons; `lib/products.ts` defines the seed catalog.
 - `data/commonplace.sqlite` stores products, orders, accounts, sessions, admin activity, and integration settings.
 
+## Architecture
+
+The application runs as one Next.js Node.js server. Server-rendered catalog pages and API route handlers share the same SQLite database through `lib/store.ts`. These Mermaid diagrams render in GitHub's Markdown preview.
+
+### Components and storage
+
+```mermaid
+flowchart TB
+    subgraph Browser["Browser"]
+        Shop["Storefront, product pages, offers and account dialogs"]
+        Cart["localStorage: cart and coupon"]
+        Admin["Admin dashboard and AWS setup"]
+        Shop <--> Cart
+    end
+
+    subgraph Server["Next.js server - Node.js runtime"]
+        Pages["Catalog and product server components"]
+        Cache["Product cache: catalog 300s, detail 60s"]
+        Products["Catalog API: /api/products"]
+        Orders["Checkout API: /api/orders"]
+        Auth["Customer auth API: /api/auth/*"]
+        AdminAPI["Admin API: /api/admin/*"]
+        Email["Authentication email delivery"]
+        Secrets["Application key and credential encryption"]
+        Store["lib/store.ts and better-sqlite3"]
+    end
+
+    subgraph Persistent["Persistent storage"]
+        DB[("data/commonplace.sqlite")]
+        Key["data/.storefront-secrets-key or configured environment key"]
+    end
+
+    Shop --> Pages
+    Shop --> Products
+    Shop --> Orders
+    Shop --> Auth
+    Admin --> AdminAPI
+    Pages --> Cache
+    Cache --> Store
+    Products --> Store
+    Orders --> Store
+    Orders -.->|Revalidate products tag| Cache
+    Auth --> Store
+    AdminAPI --> Store
+    Store --> DB
+    Auth --> Email
+    Auth -->|OTP signing| Secrets
+    AdminAPI -->|Save encrypted AWS credentials| Secrets
+    AdminAPI -->|Verify sender and test SES| SES["Amazon SES"]
+    Secrets --> Key
+    Email -->|Read saved SES settings| Store
+    Email -->|Decrypt saved credentials| Secrets
+    Email -->|Saved SES configuration| SES
+    Email -->|No SES settings; Resend configured| Resend["Resend"]
+    Email -->|No provider; development only| Terminal["Server terminal"]
+```
+
+Customer and admin authentication use separate HttpOnly session cookies with hashed tokens in SQLite. Admin overview and configuration APIs check the admin session. SES is selected before Resend; provider failures do not trigger a fallback to another provider.
+
+### Checkout transaction
+
+Prices, stock, and coupon eligibility are checked on the server. Checkout accepts customer details directly and does not require an account or call a payment provider.
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant UI as Storefront and localStorage
+    participant API as POST /api/orders
+    participant DB as SQLite
+    participant Cache as Next.js product cache
+
+    Customer->>UI: Submit checkout
+    UI->>API: Customer details, product IDs, quantities, coupon
+    API->>API: Validate request and quantity limits
+    Note over API,DB: One database transaction for order creation
+    API->>DB: Read current prices and stock
+    API->>API: Validate coupon and calculate totals
+    alt Products, stock and coupon are valid
+        API->>DB: Insert order and items; decrement stock
+        DB-->>API: Commit transaction
+        API->>DB: Record order activity after commit
+        API->>Cache: Revalidate products tag with max profile
+        API-->>UI: 201 with order ID and totals
+        UI->>UI: Clear stored cart and coupon
+        UI-->>Customer: Show order confirmation
+    else Validation or stock check fails
+        Note over API,DB: Transaction aborts; no partial order or stock changes
+        API-->>UI: Error response
+        UI-->>Customer: Show error and retain cart
+    end
+```
+
+The `max` revalidation profile marks cached products stale so they refresh on a subsequent visit. The checkout API always reads current database values, independently of the page cache.
+
+### Email verification and account creation
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant UI as Account dialog
+    participant API as Customer auth API
+    participant DB as SQLite
+    participant Delivery as SES, Resend or development terminal
+
+    Customer->>UI: Enter name, email, mobile number and password
+    UI->>API: POST /api/auth/signup
+    API->>API: Validate details, hash password and generate code
+    API->>DB: Save pending signup with code hash and expiry
+    API->>Delivery: Deliver six-digit verification code
+    API-->>UI: 202 verification required
+    Customer->>UI: Enter verification code
+    UI->>API: POST /api/auth/verify-signup
+    API->>DB: Read pending signup
+    API->>API: Check expiry, attempt limit and code hash
+    alt Code is valid
+        API->>DB: Create user and delete pending signup in a transaction
+        API->>DB: Record activity and store hashed session token
+        API-->>UI: 201 with user and HttpOnly session cookie
+        UI-->>Customer: Show signed-in account
+    else Code is incorrect, expired or attempts exhausted
+        API-->>UI: Verification error; no account created
+    end
+```
+
+The diagram shows successful code delivery; a failed send removes the newly saved pending code and returns an error. Password recovery uses the same delivery selection, storing its code in `password_reset_requests`. A valid reset updates the password, revokes existing customer sessions, and creates a new session in one transaction. Codes expire after 10 minutes, allow five attempts, and have a 60-second resend cooldown.
+
 ## License
 
 This project is proprietary. All rights are reserved; copying, modifying, or distributing it requires prior written permission. See [LICENSE](LICENSE).
