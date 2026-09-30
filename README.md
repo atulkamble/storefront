@@ -1,6 +1,18 @@
 # Storefront
 
-A full-stack homewares shop built with Next.js App Router, React, TypeScript, and SQLite.
+A full-stack homewares shop built with Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, and SQLite. Includes a product catalog, persistent browser cart, coupon checkout, email-verified customer accounts, and an admin dashboard.
+
+Checkout is a demo flow: orders update inventory, but no payment details are collected or processed.
+
+## Project structure
+
+- `app/storefront.tsx` contains the storefront, cart, checkout, and account dialogs.
+- `app/products/[id]` and `app/offers` provide product details and promotions.
+- `app/api` contains the catalog, order, customer-authentication, and admin APIs.
+- `lib/store.ts` initializes SQLite and seeds the product catalog; `lib/auth.ts` handles password hashing and customer sessions.
+- `lib/admin.ts` manages admin sessions and activity logging; `lib/aws-config.ts` and `lib/app-secrets.ts` manage email settings and encrypted credentials.
+- `lib/offers.ts` defines coupons; `lib/products.ts` defines the seed catalog.
+- `data/commonplace.sqlite` stores products, orders, accounts, sessions, admin activity, and integration settings.
 
 ## License
 
@@ -8,12 +20,53 @@ This project is proprietary. All rights are reserved; copying, modifying, or dis
 
 ## Run locally
 
+Use **Node.js 22 or later** and npm. The installed `better-sqlite3` dependency requires Node.js 22+.
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. SQLite initializes at `data/commonplace.sqlite` and seeds the catalog on first run.
+Open [http://localhost:3000](http://localhost:3000). SQLite initializes at `data/commonplace.sqlite` and inserts any missing seed products automatically; no separate database service or migration command is required.
+
+Development admin credentials are `admin` / `admin` when both admin environment variables are unset. These defaults are available only when running `next dev`; production requires `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+
+Available commands:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server. |
+| `npm run lint` | Run ESLint. |
+| `npm run build` | Create the production build. |
+| `npm start` | Serve the production build. |
+
+## Configuration
+
+Set environment variables in `.env.local` at the project root or in the hosting environment. `.env.local` is ignored by Git. Restart the server after changing it.
+
+| Variable | Purpose |
+| --- | --- |
+| `ADMIN_USERNAME` | Admin login username; required with `ADMIN_PASSWORD` in production. |
+| `ADMIN_PASSWORD` | Admin login password. Set a unique, strong value; production rejects the `admin` / `admin` pair. |
+| `RESEND_API_KEY` | Resend API key for authentication emails when saved SES settings are absent. |
+| `AUTH_EMAIL_FROM` | Sender address for Resend; required alongside `RESEND_API_KEY`. |
+| `AWS_CONFIG_ENCRYPTION_KEY` | Optional application key: exactly 64 hexadecimal characters (32 bytes). Otherwise, the app generates `data/.storefront-secrets-key`. |
+| `AUTH_OTP_SECRET` | Optional secret for signing signup and password-reset codes. Otherwise, purpose-specific secrets are derived from the application key. |
+
+No environment variables are needed for the default local demo. Without an email provider, verification codes appear in the development server terminal. Production signup and password recovery require SES or Resend.
+
+## Production
+
+Configure the admin credentials and email delivery, then run:
+
+```bash
+npm run build
+npm start
+```
+
+The app requires a Node.js server with a writable, persistent `data/` directory. Database initialization also runs during the build when product pages are prerendered. Preserve the database and application key across deployments and protect their backups. If you supply `AWS_CONFIG_ENCRYPTION_KEY`, preserve that value instead of relying on the generated key file. Losing or changing the key makes existing encrypted AWS credentials unreadable; restore the original key to recover them.
+
+Serve production traffic over HTTPS because authentication cookies use the `Secure` flag. A payment provider must be implemented before checkout can accept real payments.
 
 ## Product pages and caching
 
@@ -36,14 +89,28 @@ The Offers page is available at `/offers`. Current codes are `WELCOME10` (10% of
 - `POST /api/auth/signout` ends the current session.
 - `GET /api/auth/me` returns the current account, if signed in.
 
-Accounts store a salted scrypt password hash, never the plaintext password. Session tokens are stored as hashes in SQLite and sent to the browser in an HttpOnly cookie.
-Signup collects and stores a mobile number with the account; only the email address is verified by the signup code.
-Signup codes expire after 10 minutes and are limited to five attempts. Email can be delivered by Amazon SES from Admin > AWS setup, or by Resend using `RESEND_API_KEY` and `AUTH_EMAIL_FROM`. OTP signing and AWS credential encryption use an automatically generated application key stored at `data/.storefront-secrets-key`; keep that file in persistent storage with the SQLite database and protect backups.
-Signed-in users can reset a password using the current password. Account recovery uses a 10-minute email code with five attempts and a resend cooldown.
+Signup collects a name, email, mobile number, and password. It creates the account only after the emailed six-digit code is verified. The mobile number is stored as contact information; it is not SMS-verified.
 
-Checkout is a demo flow and does not collect or process payment details. Production deployments need a persistent database and a configured payment provider.
+Forgot password is available in the sign-in dialog. The reset request returns the same response whether or not an account exists. A valid reset code is required before the new password is saved; successful reset revokes existing sessions and signs the user in.
 
-## Admin dashboard
+Signup and password-reset codes expire after 10 minutes, allow five attempts, and have a 60-second resend cooldown. In development without an email provider, codes are printed in the terminal running `npm run dev`. Passwords are salted scrypt hashes; customer session tokens are stored as hashes and sent in an HttpOnly cookie.
 
-Open `/admin` to view customer accounts, orders, inventory alerts, and the activity audit trail. Local development defaults to username `admin` and password `admin`. Production requires `ADMIN_USERNAME` and a unique, strong `ADMIN_PASSWORD`; the development defaults are disabled in production. The audit trail records signup, sign-in/out, password reset, order placement, and admin login events. It does not record product browsing or cart changes, which remain browser-local.
-AWS SES settings are available inside the admin dashboard. Enter credentials, region, output format, and verified SES sender, then save and test the identity. Credentials are encrypted in SQLite and never returned to the UI. Verify the SES sender identity and grant the credentials permission to read that identity and send email. The stored CLI output preference does not modify the host's AWS CLI files; the app uses the AWS SDK.
+## Admin and email
+
+Open `/admin` to review customers, orders, inventory alerts, and the activity audit trail. Activity includes signup, sign-in/out, password reset, order placement, and admin access; browser-local product browsing and cart changes are not recorded.
+
+In **Admin > AWS setup**, enter AWS access keys, region, output preference, and a verified SES sender. Use **Create SES identity** to register an absent sender, then open the verification email from AWS and confirm it. **Test SES identity** checks sender verification and reports whether the account is in sandbox mode. SES sandbox accounts can send only to verified recipient addresses; request production access from AWS SES to email arbitrary customers.
+
+Signup and recovery email use the saved SES integration when configured. Otherwise they use Resend when `RESEND_API_KEY` and `AUTH_EMAIL_FROM` are set. A failed SES send does not automatically retry through Resend. Credentials are encrypted at rest with AES-256-GCM; the admin UI receives only a masked access-key hint. The integration uses the access keys saved in the dashboard. The output format is an app preference; the AWS SDK is used directly and the host's `~/.aws` files are not modified.
+
+The SES integration needs permission to read/create the configured email identity and send email. The SES account-status check also reads account sending status when the IAM credentials permit it.
+
+Admin API routes:
+
+- `POST /api/admin/login` and `POST /api/admin/logout` start and end admin sessions.
+- `GET /api/admin/overview` returns dashboard data.
+- `GET`, `POST`, and `DELETE /api/admin/aws-config` read the settings summary, save settings, and remove the saved integration.
+- `POST /api/admin/aws-config/verify-sender` requests SES sender verification.
+- `POST /api/admin/aws-config/test` checks the configured SES identity and account status.
+
+The overview and AWS configuration routes require an authenticated admin session.
