@@ -194,6 +194,44 @@ The app requires a Node.js server with a writable, persistent `data/` directory.
 
 Serve production traffic over HTTPS because authentication cookies use the `Secure` flag. A payment provider must be implemented before checkout can accept real payments.
 
+## Docker
+
+The multi-stage Dockerfile uses Node.js 22 on Debian, builds Next.js standalone output, and runs the app as the non-root `node` user. The image includes static assets and native SQLite dependencies. Local `.env` files, databases, and application keys are excluded from the build context and standalone output.
+
+Build the image:
+
+```bash
+docker build -t storefront:local .
+```
+
+Create a local `.env.docker` file with your production settings. Use a unique password in place of the placeholder:
+
+```dotenv
+ADMIN_USERNAME=storefront-admin
+ADMIN_PASSWORD=replace-with-a-unique-strong-password
+```
+
+Add `RESEND_API_KEY` and `AUTH_EMAIL_FROM` to that file if using Resend, or configure SES through the admin dashboard after startup. `.env.docker` is ignored by Git and Docker; it is passed to the container only at runtime.
+
+```bash
+docker volume create storefront-data
+docker run --detach --name storefront \
+  --publish 3000:3000 \
+  --env-file .env.docker \
+  --mount source=storefront-data,target=/app/data \
+  storefront:local
+```
+
+Open [http://localhost:3000](http://localhost:3000) to check the catalog. Use HTTPS through a reverse proxy for production authentication. The container health check calls `/api/products`, exercising both the server and SQLite.
+
+Keep the `storefront-data` volume when replacing the container: it holds the database and automatically generated application key. If using a host-directory bind mount instead, make it writable by the container's `node` user (UID/GID 1000). Run a single application instance with this local SQLite setup.
+
+## GitHub Actions
+
+[The CI workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It runs ESLint with Node.js 22 and independently builds the production Docker image, which runs `next build` and its TypeScript checks.
+
+The container job checks startup, a populated catalog, protected admin access, non-root execution, writable SQLite storage, and volume persistence across containers. npm and Docker build layers are cached. No repository secrets are required, and the workflow does not publish images or deploy the application.
+
 ## Product pages and caching
 
 Each item has a dynamic detail page at `/products/{id}`. Known product pages are prerendered and revalidated every 60 seconds; the catalog page revalidates every 5 minutes. Successful orders invalidate the shared product cache. The cart is stored in browser local storage so it survives navigation between product pages and the catalog.

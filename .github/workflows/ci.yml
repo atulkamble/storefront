@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  container:
+    name: Build and smoke-test container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build production image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: storefront:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Start container with persistent storage
+        run: |
+          docker volume create storefront-ci-data
+          docker run --detach --name storefront-ci \
+            --publish 127.0.0.1:3000:3000 \
+            --mount source=storefront-ci-data,target=/app/data \
+            storefront:ci
+      - name: Verify startup, catalog, admin protection and writable storage
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/products > /tmp/products.json; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:3000/ > /dev/null
+          curl --fail --silent --show-error http://127.0.0.1:3000/api/products > /tmp/products.json
+          node -e "const { products } = require('/tmp/products.json'); if (!Array.isArray(products) || products.length === 0) process.exit(1);"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/admin/overview)" = 401
+          test "$(docker exec storefront-ci id -u)" != 0
+          docker exec storefront-ci node -e "const fs = require('node:fs'); fs.accessSync('/app/data/commonplace.sqlite', fs.constants.R_OK | fs.constants.W_OK); fs.writeFileSync('/app/data/ci-persistence-check', 'persisted');"
+          docker run --rm --mount source=storefront-ci-data,target=/app/data \
+            --entrypoint node storefront:ci \
+            -e "if (require('node:fs').readFileSync('/app/data/ci-persistence-check', 'utf8') !== 'persisted') process.exit(1);"
+      - name: Container logs
+        if: always()
+        run: docker logs storefront-ci || true
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm --force storefront-ci || true
+          docker volume rm storefront-ci-data || true

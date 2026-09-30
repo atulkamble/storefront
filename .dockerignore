@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.agents
+.codex
+.env*
+data
+coverage
+out
+build
+.vercel
+*.tsbuildinfo
+*.log
+*.pem
+.DS_Store
+next-env.d.ts
