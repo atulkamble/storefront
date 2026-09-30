@@ -70,7 +70,7 @@ export default function AwsSettingsPanel() {
         setMessage("");
         try {
             const response = await fetch("/api/admin/aws-config/test", { method: "POST" });
-            const result = await response.json() as { message?: string; error?: string };
+            const result = await response.json() as { message?: string; error?: string; sandboxMode?: boolean };
             if (!response.ok) throw new Error(result.error ?? "AWS SES connection test failed.");
             setMessage(result.message ?? "AWS SES connection verified.");
         } catch (caught) {

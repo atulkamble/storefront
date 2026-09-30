@@ -10,7 +10,7 @@ import type { Product } from "@/lib/types";
 type Props = { products: Product[] };
 type Customer = { name: string; email: string; address: string };
 type SortOption = "popular" | "price-low-high" | "price-high-low";
-type AuthMode = "signin" | "signup" | "reset";
+type AuthMode = "signin" | "signup" | "reset" | "forgot" | "forgot-verify";
 type AccountUser = { id: string; name: string; email: string; mobileNumber: string };
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
@@ -41,8 +41,11 @@ export default function Storefront({ products }: Props) {
     const [authPassword, setAuthPassword] = useState("");
     const [authNewPassword, setAuthNewPassword] = useState("");
     const [authOtp, setAuthOtp] = useState("");
+    const [resetOtp, setResetOtp] = useState("");
     const [signupPending, setSignupPending] = useState(false);
     const [signupMessage, setSignupMessage] = useState("");
+    const [resetMessage, setResetMessage] = useState("");
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [authError, setAuthError] = useState("");
     const [authSuccess, setAuthSuccess] = useState("");
     const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -90,8 +93,11 @@ export default function Storefront({ products }: Props) {
         setAuthPassword("");
         setAuthNewPassword("");
         setAuthOtp("");
+        setResetOtp("");
         setSignupPending(false);
         setSignupMessage("");
+        setResetMessage("");
+        setShowForgotPassword(false);
         setAuthOpen(true);
     }
 
@@ -102,7 +108,17 @@ export default function Storefront({ products }: Props) {
         try {
             const isReset = authMode === "reset";
             const isVerifyingSignup = authMode === "signup" && signupPending;
-            const endpoint = isReset ? "/api/auth/reset-password" : isVerifyingSignup ? "/api/auth/verify-signup" : `/api/auth/${authMode}`;
+            const isForgotRequest = authMode === "forgot";
+            const isForgotVerify = authMode === "forgot-verify";
+            const endpoint = isReset
+                ? "/api/auth/reset-password"
+                : isVerifyingSignup
+                    ? "/api/auth/verify-signup"
+                    : isForgotRequest
+                        ? "/api/auth/forgot-password"
+                        : isForgotVerify
+                            ? "/api/auth/verify-password-reset"
+                            : `/api/auth/${authMode}`;
             const response = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -110,14 +126,32 @@ export default function Storefront({ products }: Props) {
                     ? { currentPassword: authPassword, newPassword: authNewPassword }
                     : isVerifyingSignup
                         ? { email: authEmail, code: authOtp }
-                        : { name: authName, email: authEmail, mobileNumber: authMobileNumber, password: authPassword }),
+                        : isForgotRequest
+                            ? { email: authEmail }
+                            : isForgotVerify
+                                ? { email: authEmail, code: resetOtp, newPassword: authNewPassword }
+                                : { name: authName, email: authEmail, mobileNumber: authMobileNumber, password: authPassword }),
             });
             const result = await response.json() as { user?: AccountUser; error?: string; message?: string; verificationRequired?: boolean };
             if (!response.ok) throw new Error(result.error ?? "Authentication failed.");
+            if (isForgotRequest) {
+                setAuthMode("forgot-verify");
+                setResetMessage(result.message ?? "If an account exists for that email, a reset code has been sent.");
+                return;
+            }
             if (isReset) {
                 setAuthSuccess(result.message ?? "Your password was reset.");
                 setAuthPassword("");
                 setAuthNewPassword("");
+                return;
+            }
+            if (isForgotVerify) {
+                if (!result.user) throw new Error(result.error ?? "Password reset failed.");
+                setAccount(result.user);
+                setCustomer((current) => ({ ...current, name: result.user!.name, email: result.user!.email }));
+                setAuthNewPassword("");
+                setResetOtp("");
+                setAuthOpen(false);
                 return;
             }
             if (authMode === "signup" && !isVerifyingSignup && result.verificationRequired) {
@@ -134,6 +168,9 @@ export default function Storefront({ products }: Props) {
             setAuthOpen(false);
         } catch (error) {
             setAuthError(error instanceof Error ? error.message : "Authentication failed.");
+            if (authMode === "signin" && error instanceof Error && error.message === "Email or password is incorrect.") {
+                setShowForgotPassword(true);
+            }
         } finally {
             setAuthSubmitting(false);
         }
@@ -153,6 +190,25 @@ export default function Storefront({ products }: Props) {
             setSignupMessage(result.message ?? "A new verification code has been sent.");
         } catch (error) {
             setAuthError(error instanceof Error ? error.message : "We could not send a new code.");
+        } finally {
+            setAuthSubmitting(false);
+        }
+    }
+
+    async function resendPasswordResetCode() {
+        setAuthSubmitting(true);
+        setAuthError("");
+        try {
+            const response = await fetch("/api/auth/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: authEmail, resend: true }),
+            });
+            const result = await response.json() as { error?: string; message?: string };
+            if (!response.ok) throw new Error(result.error ?? "We could not send another reset code.");
+            setResetMessage(result.message ?? "If an account exists for that email, a reset code has been sent.");
+        } catch (error) {
+            setAuthError(error instanceof Error ? error.message : "We could not send another reset code.");
         } finally {
             setAuthSubmitting(false);
         }
@@ -285,25 +341,36 @@ export default function Storefront({ products }: Props) {
         {authOpen && <>
             <button className="drawer-scrim auth-scrim" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)} />
             <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-                <div className="drawer-header"><h2 id="auth-title">{authMode === "signup" ? "Create your account" : authMode === "reset" ? "Reset your password" : "Welcome back"}</h2><button className="icon-button" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)}><X size={19} /></button></div>
+                <div className="drawer-header"><h2 id="auth-title">{authMode === "signup" ? "Create your account" : authMode === "reset" || authMode === "forgot" || authMode === "forgot-verify" ? "Reset your password" : "Welcome back"}</h2><button className="icon-button" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)}><X size={19} /></button></div>
                 {authSuccess ? <div className="auth-success" role="status"><span className="order-success-icon"><Check size={22} /></span><p>{authSuccess}</p><button className="button-primary" type="button" onClick={() => setAuthOpen(false)}>Done</button></div> : <>
-                    {authMode !== "reset" && !signupPending && <div className="auth-tabs" role="tablist" aria-label="Account access">
+                    {(authMode === "signin" || authMode === "signup") && !signupPending && <div className="auth-tabs" role="tablist" aria-label="Account access">
                         <button className={authMode === "signin" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signin"} onClick={() => { setAuthMode("signin"); setAuthError(""); setSignupPending(false); setSignupMessage(""); }}>Sign in</button>
                         <button className={authMode === "signup" ? "active" : ""} type="button" role="tab" aria-selected={authMode === "signup"} onClick={() => { setAuthMode("signup"); setAuthError(""); setSignupPending(false); setSignupMessage(""); }}>Sign up</button>
                     </div>}
                     <form className="auth-form" onSubmit={submitAuth}>
                         {authMode === "signup" && !signupPending && <label>Full name<input required minLength={2} maxLength={80} autoComplete="name" value={authName} onChange={(event) => setAuthName(event.target.value)} /></label>}
-                        {authMode !== "reset" && <label>Email<input required type="email" maxLength={254} autoComplete="email" disabled={signupPending} value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>}
+                        {authMode !== "reset" && <label>Email<input required type="email" maxLength={254} autoComplete="email" disabled={signupPending || authMode === "forgot-verify"} value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>}
                         {authMode === "signup" && !signupPending && <label>Mobile number<input required type="tel" maxLength={24} autoComplete="tel" placeholder="+1 555 123 4567" value={authMobileNumber} onChange={(event) => setAuthMobileNumber(event.target.value)} /></label>}
                         {authMode === "signup" && signupPending ? <>
                             {signupMessage && <p className="auth-note" role="status">{signupMessage}</p>}
                             <label>Verification code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" aria-label="Six-digit verification code" value={authOtp} onChange={(event) => setAuthOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
-                        </> : <label>{authMode === "reset" ? "Current password" : "Password"}<input required type="password" minLength={authMode === "signup" ? 8 : 1} maxLength={128} autoComplete={authMode === "signup" ? "new-password" : "current-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>}
+                        </> : authMode === "forgot-verify" ? <>
+                            {resetMessage && <p className="auth-note" role="status">{resetMessage}</p>}
+                            <label>Verification code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" aria-label="Six-digit password reset code" value={resetOtp} onChange={(event) => setResetOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
+                            <label>New password<input required type="password" minLength={8} maxLength={128} autoComplete="new-password" value={authNewPassword} onChange={(event) => setAuthNewPassword(event.target.value)} /></label>
+                        </> : authMode === "forgot" ? <p className="auth-note">Enter your account email and we&apos;ll send a six-digit reset code.</p>
+                            : <label>{authMode === "reset" ? "Current password" : "Password"}<input required type="password" minLength={authMode === "signup" ? 8 : 1} maxLength={128} autoComplete={authMode === "signup" ? "new-password" : "current-password"} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>}
                         {authMode === "reset" && <label>New password<input required type="password" minLength={8} maxLength={128} autoComplete="new-password" value={authNewPassword} onChange={(event) => setAuthNewPassword(event.target.value)} /></label>}
                         {authError && <p className="checkout-error" role="alert">{authError}</p>}
-                        <button className="button-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "Please wait…" : signupPending ? "Verify email" : authMode === "signup" ? "Continue" : authMode === "reset" ? "Reset password" : "Sign in"}<ArrowRight size={15} /></button>
+                        <button className="button-primary" type="submit" disabled={authSubmitting}>{authSubmitting ? "Please wait…" : signupPending ? "Verify email" : authMode === "signup" ? "Continue" : authMode === "forgot" ? "Send reset code" : authMode === "forgot-verify" || authMode === "reset" ? "Reset password" : "Sign in"}<ArrowRight size={15} /></button>
                         {signupPending && <div className="auth-verification-actions"><button type="button" onClick={resendSignupCode} disabled={authSubmitting}>Resend code</button><button type="button" onClick={() => { setSignupPending(false); setSignupMessage(""); setAuthOtp(""); setAuthError(""); }}>Change details</button></div>}
                     </form>
+                    {authMode === "signin" && <div className="auth-recovery-prompt">
+                        {showForgotPassword && <p className="auth-note" role="status">You can reset your password with a code sent to your email.</p>}
+                        <button className="auth-recovery-link" type="button" onClick={() => { setAuthMode("forgot"); setAuthError(""); setAuthSuccess(""); setAuthNewPassword(""); setResetOtp(""); setResetMessage(""); }}>Forgot your password?</button>
+                    </div>}
+                    {authMode === "forgot" && <div className="auth-verification-actions auth-recovery-actions"><button type="button" onClick={() => { setAuthMode("signin"); setAuthError(""); }}>Back to sign in</button></div>}
+                    {authMode === "forgot-verify" && <div className="auth-verification-actions auth-recovery-actions"><button type="button" onClick={resendPasswordResetCode} disabled={authSubmitting}>Resend code</button><button type="button" onClick={() => { setAuthMode("forgot"); setResetOtp(""); setAuthNewPassword(""); setAuthError(""); }}>Change email</button></div>}
                 </>}
             </section>
         </>}

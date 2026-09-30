@@ -26,6 +26,8 @@ The Offers page is available at `/offers`. Current codes are `WELCOME10` (10% of
 - `POST /api/auth/signup` emails a signup verification code; pass `{ "resend": true, "email": "..." }` to resend after the cooldown.
 - `POST /api/auth/verify-signup` verifies the emailed code, creates the account, and starts a session.
 - `POST /api/auth/signin` verifies credentials and starts a session.
+- `POST /api/auth/forgot-password` requests a short-lived email reset code without disclosing whether the account exists.
+- `POST /api/auth/verify-password-reset` verifies the reset code, changes the password, revokes existing sessions, and starts a new session.
 - `POST /api/auth/reset-password` verifies the signed-in user's current password, updates its hash, and revokes old sessions.
 - `POST /api/auth/signout` ends the current session.
 - `GET /api/auth/me` returns the current account, if signed in.
@@ -33,7 +35,7 @@ The Offers page is available at `/offers`. Current codes are `WELCOME10` (10% of
 Accounts store a salted scrypt password hash, never the plaintext password. Session tokens are stored as hashes in SQLite and sent to the browser in an HttpOnly cookie.
 Signup collects and stores a mobile number with the account; only the email address is verified by the signup code.
 Signup codes expire after 10 minutes and are limited to five attempts. Email can be delivered by Amazon SES from Admin > AWS setup, or by Resend using `RESEND_API_KEY` and `AUTH_EMAIL_FROM`. OTP signing and AWS credential encryption use an automatically generated application key stored at `data/.storefront-secrets-key`; keep that file in persistent storage with the SQLite database and protect backups.
-Password reset requires an active session and current password. Email-based account recovery is not configured.
+Signed-in users can reset a password using the current password. Account recovery uses a 10-minute email code with five attempts and a resend cooldown.
 
 Checkout is a demo flow and does not collect or process payment details. Production deployments need a persistent database and a configured payment provider.
 

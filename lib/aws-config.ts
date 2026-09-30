@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { CreateEmailIdentityCommand, GetEmailIdentityCommand, SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { CreateEmailIdentityCommand, GetAccountCommand, GetEmailIdentityCommand, SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { getApplicationKey } from "./app-secrets";
 import { storeDatabase } from "./store";
 
@@ -143,12 +143,25 @@ function createSesClient(settings: StoredAwsSettings): SESv2Client {
     });
 }
 
-export async function testAwsSesConfiguration(): Promise<{ senderEmail: string; verified: boolean }> {
+export async function testAwsSesConfiguration(): Promise<{
+    senderEmail: string;
+    verified: boolean;
+    sendingEnabled: boolean | null;
+    productionAccessEnabled: boolean | null;
+}> {
     const settings = readStoredSettings();
     if (!settings) throw new Error("Save AWS settings before testing the connection.");
     const client = createSesClient(settings);
-    const identity = await client.send(new GetEmailIdentityCommand({ EmailIdentity: settings.sender_email }));
-    return { senderEmail: settings.sender_email, verified: identity.VerifiedForSendingStatus === true };
+    const [identity, account] = await Promise.all([
+        client.send(new GetEmailIdentityCommand({ EmailIdentity: settings.sender_email })),
+        client.send(new GetAccountCommand({})).catch(() => null),
+    ]);
+    return {
+        senderEmail: settings.sender_email,
+        verified: identity.VerifiedForSendingStatus === true,
+        sendingEnabled: account?.SendingEnabled ?? null,
+        productionAccessEnabled: account?.ProductionAccessEnabled ?? null,
+    };
 }
 
 export async function requestAwsSesIdentityVerification(): Promise<{ senderEmail: string; verified: boolean; emailSent: boolean }> {
@@ -177,16 +190,28 @@ export async function requestAwsSesIdentityVerification(): Promise<{ senderEmail
 }
 
 export async function sendAwsSignupCode(email: string, code: string): Promise<void> {
+    await sendAwsVerificationCode(email, code, "signup");
+}
+
+export async function sendAwsPasswordResetCode(email: string, code: string): Promise<void> {
+    await sendAwsVerificationCode(email, code, "password-reset");
+}
+
+async function sendAwsVerificationCode(email: string, code: string, purpose: "signup" | "password-reset"): Promise<void> {
     const settings = readStoredSettings();
     if (!settings) throw new Error("AWS SES is not configured.");
+    const subject = purpose === "signup" ? "Your Storefront verification code" : "Reset your Storefront password";
+    const message = purpose === "signup"
+        ? `Your Storefront verification code is ${code}. It expires in 10 minutes.`
+        : `Your Storefront password reset code is ${code}. It expires in 10 minutes.`;
     const client = createSesClient(settings);
     await client.send(new SendEmailCommand({
         FromEmailAddress: settings.sender_email,
         Destination: { ToAddresses: [email] },
         Content: {
             Simple: {
-                Subject: { Data: "Your Storefront verification code", Charset: "UTF-8" },
-                Body: { Text: { Data: `Your Storefront verification code is ${code}. It expires in 10 minutes.`, Charset: "UTF-8" } },
+                Subject: { Data: subject, Charset: "UTF-8" },
+                Body: { Text: { Data: message, Charset: "UTF-8" } },
             },
         },
     }));

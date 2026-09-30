@@ -50,6 +50,18 @@ export function verifySignupOtp(email: string, code: string, storedHash: string)
     return timingSafeEqual(expected, actual);
 }
 
+export function hashPasswordResetOtp(email: string, code: string): string {
+    const secret = process.env.AUTH_OTP_SECRET || getApplicationSecret("password-reset-otp");
+    return createHmac("sha256", secret).update(`password-reset:${email}:${code}`).digest("hex");
+}
+
+export function verifyPasswordResetOtp(email: string, code: string, storedHash: string): boolean {
+    if (!/^[a-f0-9]{64}$/i.test(storedHash)) return false;
+    const actual = Buffer.from(hashPasswordResetOtp(email, code), "hex");
+    const expected = Buffer.from(storedHash, "hex");
+    return timingSafeEqual(expected, actual);
+}
+
 function hashSessionToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
 }

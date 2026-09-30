@@ -750,6 +750,30 @@ textarea:focus-visible {
   opacity: 0.6;
 }
 
+.auth-recovery-link {
+  display: block;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-recovery-prompt {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  margin: 14px 28px 0;
+}
+
+.auth-recovery-actions {
+  padding: 12px 28px 0;
+}
+
 .auth-success {
   display: grid;
   justify-items: center;

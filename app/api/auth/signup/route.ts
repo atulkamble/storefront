@@ -49,7 +49,8 @@ async function deliverSignupCode(email: string, code: string): Promise<void> {
 }
 
 function signupCodeMessage(): string {
-    if (hasAwsSesConfiguration() || hasResendConfiguration()) return "A verification code has been sent to your email.";
+    if (hasAwsSesConfiguration()) return "SES accepted the verification email. Check your inbox and spam folder; SES sandbox accounts can only send to verified recipients.";
+    if (hasResendConfiguration()) return "The email provider accepted the verification email. Check your inbox and spam folder.";
     return "Development code printed in the server terminal.";
 }
 
