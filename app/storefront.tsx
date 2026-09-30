@@ -6,6 +6,7 @@ import Link from "next/link";
 import { readStoredCart, useStoredCart, useStoredCoupon, writeStoredCart, writeStoredCoupon } from "@/lib/cart-storage";
 import { calculateOfferDiscount, findOffer } from "@/lib/offers";
 import type { Product } from "@/lib/types";
+import { isStaticPreview, storefrontFooterNote } from "@/lib/site-mode";
 
 type Props = { products: Product[] };
 type Customer = { name: string; email: string; address: string };
@@ -69,6 +70,7 @@ export default function Storefront({ products }: Props) {
     const couponNotice = couponCode !== dismissedCoupon ? couponCode : "";
 
     useEffect(() => {
+        if (isStaticPreview) return;
         let active = true;
         fetch("/api/auth/me")
             .then((response) => response.json())
@@ -292,14 +294,14 @@ export default function Storefront({ products }: Props) {
                 <a href="#shop">Shop all</a><a href="#shop" onClick={() => setCategory("Tableware")}>Table & kitchen</a><Link href="/offers">Offers</Link><a href="#story">Our point of view</a>
             </nav>
             <div className="header-actions">
-                {account ? <>
+                {!isStaticPreview && (account ? <>
                     <span className="account-greeting">Hi, {account.name.split(" ")[0]}</span>
                     <button className="icon-button auth-reset-trigger" type="button" aria-label="Reset password" title="Reset password" onClick={() => openAuth("reset")}><KeyRound size={17} /></button>
                     <button className="auth-button" type="button" onClick={signOut}>Sign out</button>
                 </> : <>
                     <button className="auth-button" type="button" onClick={() => openAuth("signin")}>Sign in</button>
                     <button className="auth-button auth-signup" type="button" onClick={() => openAuth("signup")}>Sign up</button>
-                </>}
+                </>)}
                 <button className="icon-button" type="button" aria-label="Search products" onClick={() => setSearchOpen(!searchOpen)}>{searchOpen ? <X size={18} /> : <Search size={18} />}</button>
                 <button className="icon-button cart-trigger" type="button" aria-label={`Open bag, ${cartCount} items`} onClick={() => { setCartOpen(true); setOrderError(""); setBagNotice(null); setDismissedCoupon(couponCode); }}><ShoppingBag size={19} />{cartCount > 0 && <span className="cart-count">{cartCount}</span>}</button>
             </div>
@@ -336,7 +338,7 @@ export default function Storefront({ products }: Props) {
 
             <section className="story-band" id="story"><div className="story-image" role="img" aria-label="Natural materials and handmade home objects" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1300&q=85)" }} /><div className="story-copy"><p className="eyebrow">Buy less, live with more</p><h2>Good things earn their place.</h2><p>We look for honest materials, thoughtful making, and the kind of quiet beauty that gets better with use. No grand gestures. Just the right things, for a long time.</p></div></section>
         </main>
-        <footer className="site-footer"><a className="wordmark" href="#top">store<span>front</span></a><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
+        <footer className="site-footer"><a className="wordmark" href="#top">store<span>front</span></a><p className="footer-note">{storefrontFooterNote}</p></footer>
 
         {authOpen && <>
             <button className="drawer-scrim auth-scrim" type="button" aria-label="Close account form" onClick={() => setAuthOpen(false)} />
@@ -405,7 +407,7 @@ export default function Storefront({ products }: Props) {
                         {discount > 0 && <div className="discount-row"><span>Offer discount</span><span>-{money(discount)}</span></div>}
                         <div className="total-row"><span>Estimated total</span><strong>{money(estimatedTotal)}</strong></div>
                         <p className="shipping-note">Shipping and any applicable taxes are calculated separately.</p>
-                        {checkout ? <form className="checkout-form" onSubmit={placeOrder}>
+                        {isStaticPreview ? <p className="payment-note" role="status">Your bag is saved in this browser. Checkout and accounts are unavailable in this preview.</p> : checkout ? <form className="checkout-form" onSubmit={placeOrder}>
                             <label>Name<input required minLength={2} maxLength={80} autoComplete="name" value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} /></label>
                             <label>Email<input required type="email" maxLength={254} autoComplete="email" value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} /></label>
                             <label>Shipping address<textarea required minLength={8} maxLength={300} autoComplete="street-address" value={customer.address} onChange={(event) => setCustomer({ ...customer, address: event.target.value })} /></label>

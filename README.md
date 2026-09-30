@@ -194,7 +194,7 @@ The app requires a Node.js server with a writable, persistent `data/` directory.
 
 Serve production traffic over HTTPS because authentication cookies use the `Secure` flag. A payment provider must be implemented before checkout can accept real payments.
 
-Deploy this application to a Node.js or Docker host with persistent storage. GitHub Pages serves static files and cannot run the checkout, customer sessions, admin APIs, SQLite writes, or cache revalidation. This project produces `.next/standalone/`, not the static `out/` directory expected by the Pages template. The incompatible Pages workflow has been removed; the CI workflow builds and smoke-tests the production container.
+Deploy the full application to a Node.js or Docker host with persistent storage. GitHub Pages serves the separate catalog preview described below; checkout, customer sessions, admin APIs, SQLite writes, and cache revalidation require the full server application.
 
 ## Docker
 
@@ -233,6 +233,18 @@ Keep the `storefront-data` volume when replacing the container: it holds the dat
 [The CI workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It runs ESLint with Node.js 22 and independently builds the production Docker image, which runs `next build` and its TypeScript checks.
 
 The container job checks startup, a populated catalog, protected admin access, non-root execution, writable SQLite storage, and volume persistence across containers. npm and Docker build layers are cached. No repository secrets are required, and the workflow does not publish images or deploy the application.
+
+## GitHub Pages storefront
+
+[The public storefront preview](https://atulkamble.github.io/storefront/) is built from `pages-preview/`, which reuses the main app's layout, storefront, product pages, and offers. It reads the public seed catalog without opening SQLite. Search, filters, sorting, favorites, cart quantities, and coupons work in the browser. Account controls and checkout are unavailable in this preview; the Docker app retains those features.
+
+```bash
+npm run build:pages
+```
+
+The export is written to `pages-preview/out/`, with `/storefront` as its base path and directory-style URLs for product and offer pages. [The Pages workflow](.github/workflows/pages.yml) validates exports on pull requests and publishes them on pushes to `main` or manual runs. It uploads the generated website rather than the repository source.
+
+In repository **Settings > Pages > Build and deployment**, select **GitHub Actions** as the source. Publishing directly from the `main` branch root invokes Jekyll and can display the README instead of the storefront. The full application still uses `npm run build` and `.next/standalone/` for Docker or Node.js hosting.
 
 ## Product pages and caching
 

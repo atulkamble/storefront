@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, PackageCheck } from "lucide-react";
 import { notFound } from "next/navigation";
 import AddToBag from "./add-to-bag";
-import { getCachedProductById, getProducts } from "@/lib/store";
+import { getCachedProductById, getProducts } from "@/lib/catalog";
+import { storefrontFooterNote } from "@/lib/site-mode";
 
 type ProductPageProps = {
     params: Promise<{ id: string }>;
@@ -12,7 +13,7 @@ type ProductPageProps = {
 export const revalidate = 60;
 
 export async function generateStaticParams() {
-    return getProducts().map((product) => ({ id: product.id }));
+    return (await getProducts()).map((product) => ({ id: product.id }));
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -58,7 +59,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     </section>
                 </div>
             </main>
-            <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
+            <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">{storefrontFooterNote}</p></footer>
         </>
     );
 }

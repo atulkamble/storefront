@@ -1,5 +1,5 @@
 import Storefront from "./storefront";
-import { getCachedProducts } from "@/lib/store";
+import { getCachedProducts } from "@/lib/catalog";
 
 export const revalidate = 300;
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import ApplyOfferButton from "./apply-offer-button";
 import { offers } from "@/lib/offers";
+import { storefrontFooterNote } from "@/lib/site-mode";
 
 export const metadata: Metadata = {
     title: "Offers | Storefront",
@@ -38,6 +39,6 @@ export default function OffersPage() {
             <p className="offers-footnote">One offer per order. Offers apply to merchandise subtotal before shipping and taxes.</p>
             <Link className="offers-back-link" href="/#shop">Back to the collection <ArrowRight size={15} /></Link>
         </main>
-        <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">Small things, considered well. Checkout places a demo order and does not process a payment.</p></footer>
+        <footer className="site-footer"><Link className="wordmark" href="/">store<span>front</span></Link><p className="footer-note">{storefrontFooterNote}</p></footer>
     </>;
 }

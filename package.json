@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:pages": "next build pages-preview",
     "start": "next start",
     "lint": "eslint"
   },
