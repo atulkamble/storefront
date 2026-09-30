@@ -194,6 +194,8 @@ The app requires a Node.js server with a writable, persistent `data/` directory.
 
 Serve production traffic over HTTPS because authentication cookies use the `Secure` flag. A payment provider must be implemented before checkout can accept real payments.
 
+Deploy this application to a Node.js or Docker host with persistent storage. GitHub Pages serves static files and cannot run the checkout, customer sessions, admin APIs, SQLite writes, or cache revalidation. This project produces `.next/standalone/`, not the static `out/` directory expected by the Pages template. The incompatible Pages workflow has been removed; the CI workflow builds and smoke-tests the production container.
+
 ## Docker
 
 The multi-stage Dockerfile uses Node.js 22 on Debian, builds Next.js standalone output, and runs the app as the non-root `node` user. The image includes static assets and native SQLite dependencies. Local `.env` files, databases, and application keys are excluded from the build context and standalone output.
