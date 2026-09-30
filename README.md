@@ -2,6 +2,10 @@
 
 A full-stack homewares shop built with Next.js App Router, React, TypeScript, and SQLite.
 
+## License
+
+This project is proprietary. All rights are reserved; copying, modifying, or distributing it requires prior written permission. See [LICENSE](LICENSE).
+
 ## Run locally
 
 ```bash
