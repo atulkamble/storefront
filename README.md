@@ -67,8 +67,8 @@ flowchart TB
     Email -->|Read saved SES settings| Store
     Email -->|Decrypt saved credentials| Secrets
     Email -->|Saved SES configuration| SES
-    Email -->|No SES settings; Resend configured| Resend["Resend"]
-    Email -->|No provider; development only| Terminal["Server terminal"]
+    Email -->|No SES settings and Resend configured| Resend["Resend"]
+    Email -->|No provider and development mode| Terminal["Server terminal"]
 ```
 
 Customer and admin authentication use separate HttpOnly session cookies with hashed tokens in SQLite. Admin overview and configuration APIs check the admin session. SES is selected before Resend; provider failures do not trigger a fallback to another provider.
@@ -92,7 +92,7 @@ sequenceDiagram
     API->>DB: Read current prices and stock
     API->>API: Validate coupon and calculate totals
     alt Products, stock and coupon are valid
-        API->>DB: Insert order and items; decrement stock
+        API->>DB: Insert order and items and decrement stock
         DB-->>API: Commit transaction
         API->>DB: Record order activity after commit
         API->>Cache: Revalidate products tag with max profile
@@ -100,7 +100,7 @@ sequenceDiagram
         UI->>UI: Clear stored cart and coupon
         UI-->>Customer: Show order confirmation
     else Validation or stock check fails
-        Note over API,DB: Transaction aborts; no partial order or stock changes
+        Note over API,DB: Transaction aborts with no partial order or stock changes
         API-->>UI: Error response
         UI-->>Customer: Show error and retain cart
     end
@@ -134,7 +134,7 @@ sequenceDiagram
         API-->>UI: 201 with user and HttpOnly session cookie
         UI-->>Customer: Show signed-in account
     else Code is incorrect, expired or attempts exhausted
-        API-->>UI: Verification error; no account created
+        API-->>UI: Verification error with no account created
     end
 ```
 
