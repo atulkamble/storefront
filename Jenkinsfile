@@ -36,7 +36,7 @@ pipeline {
             }
         }
 
-        stage( AWS CLI configuration') {
+        stage( 'AWS CLI configuration') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
