@@ -51,6 +51,12 @@ pipeline {
             }
         }
 
+        stage ('Install kubectl') {
+            steps {
+                sh 'cat /etc/os-release'
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 sh 'kubectl apply -f k8s/'
