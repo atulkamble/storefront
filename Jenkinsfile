@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = 'docker.io/atuljkamble/storefront:latest'
+        IMAGE      = 'docker.io/atuljkamble/storefront:latest'
         AWS_REGION = 'us-east-1'
         EKS_CLUSTER = 'mycluster'
     }
@@ -38,7 +38,16 @@ pipeline {
 
         stage('Configure EKS Access') {
             steps {
-                sh 'aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws'
+                ]]) {
+                    sh '''
+                        aws eks update-kubeconfig \
+                            --name "$EKS_CLUSTER" \
+                            --region "$AWS_REGION"
+                    '''
+                }
             }
         }
 
