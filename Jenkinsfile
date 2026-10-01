@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE      = 'docker.io/atuljkamble/storefront:$BUILD_NUMBER'
+        IMAGE      = "docker.io/atuljkamble/storefront:${BUILD_NUMBER}"
         AWS_REGION = 'us-east-1'
         EKS_CLUSTER = 'mycluster'
     }
