@@ -53,7 +53,9 @@ pipeline {
 
         stage ('Install kubectl') {
             steps {
-                sh 'cat /etc/os-release'
+                sh 'curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"'
+                sh 'chmod +x kubectl'
+                sh 'kubectl version --client'
             }
         }
 
