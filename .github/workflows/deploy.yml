@@ -1,4 +1,4 @@
-name: Storefront CI/CD
+name: Storefront App CI/CD Pipeline
 
 on:
   push:
