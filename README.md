@@ -292,3 +292,53 @@ Admin API routes:
 - `POST /api/admin/aws-config/test` checks the configured SES identity and account status.
 
 The overview and AWS configuration routes require an authenticated admin session.
+
+
+
+Add all four as **GitHub Actions Repository Secrets**.
+
+For your `storefront` repository, open:
+
+**GitHub → Repository → Settings → Secrets and variables → Actions → Secrets → New repository secret**
+
+Then create these one by one:
+
+| Secret Name | Value to enter |
+|---|---|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username, e.g. `atuljkamble` |
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `AWS_ACCESS_KEY_ID` | Your AWS IAM access key ID |
+| `AWS_SECRET_ACCESS_KEY` | Your AWS IAM secret access key |
+
+Your workflow then accesses them like this:
+
+```yaml
+- name: Docker Hub Login
+  uses: docker/login-action@v3
+  with:
+    username: ${{ secrets.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+- name: Configure AWS Credentials
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    aws-region: us-east-1
+```
+
+### Where exactly?
+
+```text
+GitHub
+└── atulkamble/storefront
+    └── Settings
+        └── Secrets and variables
+            └── Actions
+                └── Secrets
+                    └── New repository secret
+```
+
+After adding them, you'll see the **names** listed under Repository secrets, but GitHub will not show their secret values again.
+
+Do **not** put the actual passwords, tokens, or AWS secret keys directly inside `deploy.yml` or commit them to Git.
