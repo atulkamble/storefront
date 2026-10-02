@@ -1,3 +1,618 @@
+# E-Commerce Website – AWS DevOps Project
+
+## 1. Project Overview
+
+This project demonstrates an end-to-end DevOps CI/CD implementation for an E-Commerce Website using:
+
+- GitHub
+- Node.js
+- npm
+- SQLite
+- Docker
+- Jenkins
+- GitHub Actions
+- Terraform
+- AWS
+- Amazon EKS
+- Kubernetes
+- Load Balancer
+
+---
+
+## 2. Project Architecture
+
+```text
+Developer
+    |
+    v
+GitHub Repository
+    |
+    v
+CI/CD Pipeline
+(Jenkins / GitHub Actions)
+    |
+    v
+Docker Build
+    |
+    v
+Docker Registry
+    |
+    v
+Amazon EKS
+    |
+    v
+Kubernetes Deployment
+    |
+    v
+LoadBalancer
+    |
+    v
+E-Commerce Website
+```
+
+---
+
+## 3. Create Repository
+
+Create a GitHub repository:
+
+```text
+AWS-DevOps-Project
+```
+
+Clone the repository:
+
+```bash
+git clone <repository-url>
+cd AWS-DevOps-Project
+```
+
+---
+
+## 4. Install Node.js
+
+Download and install Node.js:
+
+https://nodejs.org/en/download
+
+Verify installation:
+
+```bash
+node -v
+npm -v
+```
+
+---
+
+## 5. Node.js / npm Setup
+
+Initialize the project:
+
+```bash
+npm init
+```
+
+Check files:
+
+```bash
+ls
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Install development dependencies:
+
+```bash
+npm install -D <package-name>
+```
+
+Check available scripts:
+
+```bash
+npm run
+```
+
+Build application:
+
+```bash
+npm run build
+```
+
+Run lint:
+
+```bash
+npm run lint
+```
+
+If a `compile` script exists in `package.json`:
+
+```bash
+npm run compile
+```
+
+---
+
+## 6. SQLite Database
+
+Go to the database directory:
+
+```bash
+cd data
+```
+
+Start SQLite:
+
+```bash
+sqlite3
+```
+
+Create or open database:
+
+```bash
+sqlite3 my_database.db
+```
+
+Check databases:
+
+```sql
+.databases
+```
+
+Open database:
+
+```sql
+.open filename.db
+```
+
+List tables:
+
+```sql
+.tables
+```
+
+Example query:
+
+```sql
+SELECT * FROM users
+WHERE age > 21
+ORDER BY name ASC;
+```
+
+---
+
+# Jenkins CI/CD
+
+## 7. Create Jenkins Server
+
+Use Terraform to provision the Jenkins server.
+
+```text
+Terraform
+   |
+   v
+Jenkins Server
+```
+
+Also use Terraform to provision the Amazon EKS cluster.
+
+```text
+Terraform
+   |
+   v
+Amazon EKS
+```
+
+---
+
+## 8. Install Jenkins Plugins
+
+Open:
+
+```text
+Jenkins
+>> Manage Jenkins
+>> Plugins
+```
+
+Install:
+
+- Docker
+- Docker Pipeline
+- Blue Ocean
+- AWS Credentials
+
+---
+
+## 9. Configure Jenkins Credentials
+
+Open:
+
+```text
+Jenkins
+>> Manage Jenkins
+>> Credentials
+```
+
+Add:
+
+```text
+GitHub Token
+Docker Hub Token / Credentials
+AWS Credentials
+```
+
+Never store passwords, tokens, or AWS keys directly in the Jenkinsfile.
+
+---
+
+## 10. Jenkins Pipeline Flow
+
+```text
+GitHub
+   |
+   v
+Checkout
+   |
+   v
+Docker Build
+   |
+   v
+Docker Push
+   |
+   v
+AWS Credentials
+   |
+   v
+EKS Kubeconfig
+   |
+   v
+kubectl
+   |
+   v
+Kubernetes YAML
+   |
+   v
+EKS Deployment
+   |
+   v
+LoadBalancer
+```
+
+Use the Jenkins build number as the Docker image tag.
+
+Example:
+
+```text
+docker.io/username/storefront:${BUILD_NUMBER}
+```
+
+---
+
+# GitHub Actions CI/CD
+
+## 11. Fork Application Repository
+
+Fork:
+
+https://github.com/atulkamble/storefront
+
+---
+
+## 12. Configure Docker Image
+
+Open the GitHub Actions workflow file.
+
+Update:
+
+```yaml
+IMAGE_NAME: your-username/storefront
+```
+
+Example:
+
+```yaml
+IMAGE_NAME: atuljkamble/storefront
+```
+
+---
+
+## 13. Configure GitHub Secrets
+
+Go to:
+
+```text
+GitHub Repository
+>> Settings
+>> Secrets and variables
+>> Actions
+>> New repository secret
+```
+
+Create:
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+
+### Secrets Purpose
+
+| Secret | Purpose |
+|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `AWS_ACCESS_KEY_ID` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key |
+
+---
+
+# Amazon EKS
+
+## 14. Create EKS Cluster
+
+Create the cluster:
+
+```bash
+eksctl create cluster \
+  --name mycluster \
+  --region us-east-1 \
+  --nodegroup-name mynodes \
+  --node-type t3.medium \
+  --nodes 2 \
+  --nodes-min 2 \
+  --nodes-max 2 \
+  --managed
+```
+
+---
+
+## 15. Configure kubectl
+
+Update kubeconfig:
+
+```bash
+aws eks update-kubeconfig \
+  --name mycluster \
+  --region us-east-1
+```
+
+Verify cluster:
+
+```bash
+kubectl get nodes
+```
+
+---
+
+## 16. Verify Kubernetes Resources
+
+Check nodes:
+
+```bash
+kubectl get nodes
+```
+
+Check pods:
+
+```bash
+kubectl get pods -o wide
+```
+
+Check services:
+
+```bash
+kubectl get svc
+```
+
+---
+
+## 17. GitHub Actions Deployment Flow
+
+```text
+Developer
+    |
+    v
+Git Push
+    |
+    v
+GitHub Repository
+    |
+    v
+GitHub Actions
+    |
+    v
+Checkout
+    |
+    v
+Docker Build
+    |
+    v
+Docker Hub Login
+    |
+    v
+Docker Push
+    |
+    v
+AWS Authentication
+    |
+    v
+Configure EKS
+    |
+    v
+kubectl apply
+    |
+    v
+EKS
+    |
+    v
+LoadBalancer
+```
+
+---
+
+# Access Application
+
+## 18. Get LoadBalancer URL
+
+Run:
+
+```bash
+kubectl get svc
+```
+
+You can also find the Load Balancer from:
+
+```text
+AWS Console
+>> EC2
+>> Load Balancers
+>> Select Load Balancer
+>> Copy DNS Name
+```
+
+Example:
+
+```text
+http://adce5f27e2c7548a48872b49a6ee7a02-1443550287.us-east-1.elb.amazonaws.com:3000/
+```
+
+Open the URL in a web browser.
+
+---
+
+# Cleanup
+
+## 19. Delete EKS Cluster
+
+After completing the lab, delete the cluster to avoid unnecessary AWS charges:
+
+```bash
+eksctl delete cluster \
+  --name mycluster \
+  --region us-east-1
+```
+
+---
+
+# Important Points to Remember
+
+1. Never commit AWS credentials or Docker Hub tokens to GitHub.
+2. Use GitHub Actions Secrets for GitHub CI/CD.
+3. Use Jenkins Credentials for Jenkins CI/CD.
+4. Use unique Docker image tags for different builds.
+5. Verify EKS before deployment:
+
+```bash
+kubectl get nodes
+```
+
+6. Verify pods after deployment:
+
+```bash
+kubectl get pods -o wide
+```
+
+7. Verify services:
+
+```bash
+kubectl get svc
+```
+
+8. Use the LoadBalancer hostname to access the application.
+9. Delete unused AWS resources after completing the lab.
+10. Monitor GitHub Actions or Jenkins logs when troubleshooting deployment failures.
+
+---
+
+## Complete CI/CD Flow
+
+```text
+Code
+  |
+  v
+GitHub
+  |
+  v
+Jenkins / GitHub Actions
+  |
+  v
+Build
+  |
+  v
+Test
+  |
+  v
+Docker Build
+  |
+  v
+Docker Push
+  |
+  v
+Amazon EKS
+  |
+  v
+Kubernetes Deployment
+  |
+  v
+LoadBalancer
+  |
+  v
+E-Commerce Website
+```
+
+---
+
+## Useful Commands
+
+```bash
+# Node.js
+node -v
+npm -v
+npm install
+npm run build
+npm run lint
+
+# AWS
+aws sts get-caller-identity
+aws eks update-kubeconfig --name mycluster --region us-east-1
+
+# Kubernetes
+kubectl get nodes
+kubectl get pods -o wide
+kubectl get svc
+kubectl get deployments
+
+# EKS
+eksctl get cluster
+eksctl delete cluster --name mycluster --region us-east-1
+```
+
+---
+
+# Project Summary
+
+```text
+Application      : E-Commerce Website
+Source Control   : GitHub
+Runtime          : Node.js
+Package Manager  : npm
+Database         : SQLite
+Container        : Docker
+CI/CD            : Jenkins / GitHub Actions
+Infrastructure   : Terraform
+Cloud            : AWS
+Orchestration    : Kubernetes
+Cluster          : Amazon EKS
+Exposure         : AWS Load Balancer
+```
+
+
 # Storefront
 
 A full-stack homewares shop built with Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, and SQLite. Includes a product catalog, persistent browser cart, coupon checkout, email-verified customer accounts, and an admin dashboard.
